@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif; /* Ensures Geist font is primary */
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 224 71% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 71% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71% 4%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 220 20% 96.1%;
+    --secondary-foreground: 221 83% 53%;
+    --muted: 220 20% 96.1%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 25 95% 65%;
+    --accent-foreground: 24 9.8% 10%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221 83% 63%;
+    --chart-1: 221 83% 53%;
+    --chart-2: 158 79% 41%; /* Kept green for grade pass indicator */
+    --chart-3: 25 95% 65%; /* Orange */
+    --chart-4: 0 72% 51%; /* Red */
+    --chart-5: 270 70% 60%;
+    --radius: 1rem;
+  }
+  .dark {
+    --background: 222 47% 11.2%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 11.2%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 11.2%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 25 95% 65%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-image:
+      radial-gradient(at 25% 15%, hsl(var(--primary) / 0.1) 0px, transparent 50%),
+      radial-gradient(at 75% 85%, hsl(var(--accent) / 0.1) 0px, transparent 50%),
+      radial-gradient(at 5% 95%, hsl(var(--primary) / 0.08) 0px, transparent 60%);
+    min-height: 100vh;
+    background-attachment: fixed;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(at 25% 15%, hsl(var(--primary) / 0.2) 0px, transparent 50%),
+      radial-gradient(at 75% 85%, hsl(var(--accent) / 0.2) 0px, transparent 50%),
+      radial-gradient(at 5% 95%, hsl(var(--primary) / 0.15) 0px, transparent 60%);
+  }
+}
