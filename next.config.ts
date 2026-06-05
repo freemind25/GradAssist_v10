@@ -1,16 +1,22 @@
-
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // ── Sécurité build ──────────────────────────────────────────────────
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,   // Erreurs TS bloquent le build en prod
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,  // ESLint actif en CI
   },
-  output: "standalone",
+
+  // ── Docker standalone ───────────────────────────────────────────────
+  output: 'standalone',
+
+  // ── Images ──────────────────────────────────────────────────────────
   images: {
+    dangerouslyAllowSVG: false, // Sécurité : SVG distants désactivés
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     remotePatterns: [
       {
         protocol: 'https',
@@ -19,23 +25,19 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
-    // Allow Data URLs for image previews (e.g., uploaded logos)
-    dangerouslyAllowSVG: true, 
-    contentDispositionType: 'attachment',
-    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
-    domains: [], // Keep empty if not using external domains other than remotePatterns
-    loader: 'default', // or 'imgix', 'cloudinary', 'akamai', 'custom'
-    path: '/_next/image',
-    unoptimized: false, // Set to true if you don't want optimization, e.g. for SVGs or animated GIFs
   },
-   devIndicators: {
+
+  // ── Dev indicators ──────────────────────────────────────────────────
+  devIndicators: {
     buildActivity: false,
   },
+
+  // ── Origines dev autorisées (Firebase Studio) ───────────────────────
   experimental: {
     allowedDevOrigins: [
-        "https://6000-firebase-studio-1746986812400.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev"
-    ]
-  }
+      'https://6000-firebase-studio-1746986812400.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev',
+    ],
+  },
 };
 
 export default nextConfig;

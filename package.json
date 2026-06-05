@@ -9,7 +9,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "quality": "npm run lint && npm run typecheck",
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "cy:run:smoke": "cypress run --spec \"cypress/e2e/00-smoke.cy.ts\""
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.8.0",
@@ -68,6 +72,7 @@
     "genkit-cli": "^1.8.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "cypress": "^14.0.0"
   }
 }
