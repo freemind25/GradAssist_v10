@@ -1,7 +1,5 @@
-# wrangler.toml — Cloudflare Pages GradeAssist v10
+# wrangler.toml — GradeAssist v10 — Cloudflare Pages
 name = "gradeassist-v10"
+pages_build_output_dir = ".next"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
-
-[env.production]
-name = "gradeassist-v10"
