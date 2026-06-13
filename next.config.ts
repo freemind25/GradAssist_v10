@@ -1,15 +1,13 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // ── Sécurité build ──────────────────────────────────────────────────
   typescript: {
     ignoreBuildErrors: false,
   },
   eslint: {
-    ignoreDuringBuilds: false,
+    // ESLint géré séparément — ne bloque pas le build de production
+    ignoreDuringBuilds: true,
   },
-
-  // ── Images ──────────────────────────────────────────────────────────
   images: {
     dangerouslyAllowSVG: false,
     contentDispositionType: 'attachment',
