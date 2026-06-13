@@ -18,12 +18,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20.18.0'
-          cache: 'npm'
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
         env:
           CYPRESS_INSTALL_BINARY: 0
+          NEXT_TELEMETRY_DISABLED: 1
 
       - name: TypeScript check
         run: npx tsc --noEmit
