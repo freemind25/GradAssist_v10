@@ -135,7 +135,7 @@ export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
                 <>
                 <Card className="shadow-lg border-t-4 border-accent">
                     <CardHeader>
-                        <CardTitle>Grille d'Évaluation de l'Atelier</CardTitle>
+                        <CardTitle>Grille d&apos;Évaluation de l&apos;Atelier</CardTitle>
                         <CardDescription>
                             Attribuez une note pour chaque critère. Les points sont calculés en fonction du coefficient. La somme des coefficients devrait être {TARGET_SUM_COEFFICIENTS}.
                         </CardDescription>
@@ -144,7 +144,7 @@ export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
                                 <AlertCircle className="h-4 w-4" />
                                 <AlertTitle>Attention</AlertTitle>
                                 <AlertDescription>
-                                    La somme des coefficients ({currentCoefficientSum.toFixed(2)}) est différente de l'objectif de {TARGET_SUM_COEFFICIENTS}.
+                                    La somme des coefficients ({currentCoefficientSum.toFixed(2)}) est différente de l&apos;objectif de {TARGET_SUM_COEFFICIENTS}.
                                 </AlertDescription>
                             </Alert>
                         )}
@@ -221,7 +221,7 @@ export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
                 <CardHeader>
                     <CardTitle>Synthèse des Évaluations</CardTitle>
                     <CardDescription>
-                        Ajoutez l'évaluation actuelle à la synthèse pour la sauvegarder, puis réinitialisez le formulaire pour une nouvelle saisie.
+                        Ajoutez l&apos;évaluation actuelle à la synthèse pour la sauvegarder, puis réinitialisez le formulaire pour une nouvelle saisie.
                         Vous pourrez ensuite exporter la synthèse complète.
                     </CardDescription>
                 </CardHeader>

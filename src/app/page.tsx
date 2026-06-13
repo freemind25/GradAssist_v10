@@ -125,7 +125,7 @@ function NewModuleDialog({ onCreate, trigger }: { onCreate: (name: string, type:
         <DialogHeader>
           <DialogTitle>Créer une nouvelle matière</DialogTitle>
           <DialogDescription>
-            Choisissez un nom et un type d'évaluation pour votre nouvelle matière ou atelier.
+            Choisissez un nom et un type d&apos;évaluation pour votre nouvelle matière ou atelier.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -293,7 +293,7 @@ export default function GradeAssistPage() {
   if (!isLoaded || !activeModule) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p>Chargement de l'application...</p>
+        <p>Chargement de l&apos;application...</p>
       </div>
     );
   }
@@ -329,7 +329,7 @@ export default function GradeAssistPage() {
                 </h1>
                 <p className="text-xs text-muted-foreground mt-1 font-bold">Designed by M.SADI</p>
                 <p className="text-base sm:text-lg text-muted-foreground mt-1">
-                    Application d'Évaluation Modulaire
+                    Application d&apos;Évaluation Modulaire
                 </p>
                 </div>
             </div>
@@ -399,7 +399,7 @@ export default function GradeAssistPage() {
                                     <AlertDialogHeader>
                                         <AlertDialogTitle>Êtes-vous absolument sûr ?</AlertDialogTitle>
                                         <AlertDialogDescription>
-                                            Cette action supprimera définitivement le module "{activeModule.name}" et toutes ses données d'évaluation associées.
+                                            Cette action supprimera définitivement le module &ldquo;{activeModule.name}&rdquo; et toutes ses données d&apos;évaluation associées.
                                         </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
