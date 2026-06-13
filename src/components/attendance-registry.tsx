@@ -243,33 +243,26 @@ export function AttendanceRegistry({
         yPos += 20;
         
         const dayHeaders = recordedDays.map(day => format(day, 'd'));
-        const nbDays = dayHeaders.length;
-        const lastColIdx = nbDays + 1;
+        const lastColIdx = dayHeaders.length + 1;
 
-        // Ligne 1 : en-têtes fusionnés
-        const headRow1: import('jspdf-autotable').CellInput[] = [
-            { content: 'Nom et Prénom', rowSpan: 2, styles: { valign: 'middle' as const, fillColor: [220, 220, 220] as [number, number, number] } } as import('jspdf-autotable').CellInput,
-            { content: format(new Date(year, month, 1), 'MMMM', { locale: fr }), colSpan: nbDays, styles: { halign: 'center' as const, fillColor: [240, 240, 240] as [number, number, number], textColor: 0 } } as import('jspdf-autotable').CellInput,
-            { content: 'Total Absences', rowSpan: 2, styles: { valign: 'middle' as const, fillColor: [255, 210, 210] as [number, number, number] } } as import('jspdf-autotable').CellInput,
-        ];
-        // Ligne 2 : numéros des jours
-        const headRow2: import('jspdf-autotable').CellInput[] = dayHeaders.map(d => d as import('jspdf-autotable').CellInput);
+        // En-tête simple (une seule ligne) — évite les problèmes de typage rowSpan/colSpan
+        const simpleHead = [['Nom et Prénom', ...dayHeaders, 'Absences']];
 
         const body = studentReports.map(({ name, dailyStatuses, absenceCount }) => {
             const rowData = recordedDays.map(day => dailyStatuses[day.getDate()] || 'P');
-            return [name, ...rowData, absenceCount];
+            return [name, ...rowData, String(absenceCount)];
         });
 
         autoTable(doc, {
-            head: [headRow1, headRow2],
+            head: simpleHead,
             body: body,
             startY: yPos,
             theme: 'grid',
             styles: { fontSize: 7, cellPadding: 1, halign: 'center' as const, valign: 'middle' as const },
-            headStyles: { fillColor: [220, 220, 220] as [number, number, number], textColor: 0, fontStyle: 'bold' as const },
+            headStyles: { fillColor: [30, 80, 160] as [number, number, number], textColor: 255, fontStyle: 'bold' as const },
             columnStyles: {
                 0: { halign: 'left' as const, fontStyle: 'bold' as const, minCellWidth: 40 },
-                [lastColIdx]: { fontStyle: 'bold' as const, halign: 'center' as const, textColor: [200, 0, 0] as [number, number, number] },
+                [lastColIdx]: { fontStyle: 'bold' as const, halign: 'center' as const },
             },
             didParseCell: (data) => {
                 if (data.section === 'body' && data.column.index > 0 && data.column.index <= dayHeaders.length) {
@@ -277,12 +270,10 @@ export function AttendanceRegistry({
                     if (cellText === 'A') {
                         data.cell.styles.fillColor = '#ffcdd2';
                         data.cell.styles.textColor = '#b71c1c';
-                    }
-                    if (cellText === 'R') {
+                    } else if (cellText === 'R') {
                         data.cell.styles.fillColor = '#ffecb3';
                         data.cell.styles.textColor = '#e65100';
-                    }
-                    if (cellText === 'E') {
+                    } else if (cellText === 'E') {
                         data.cell.styles.fillColor = '#bbdefb';
                         data.cell.styles.textColor = '#0d47a1';
                     }
