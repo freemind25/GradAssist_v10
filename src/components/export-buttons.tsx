@@ -3,10 +3,11 @@
 
 import { Button } from "@/components/ui/button";
 import { Download, FileText } from "lucide-react";
-import type { Criterion, SelectedGrades } from "@/types";
+import type { Criterion, SelectedGrades, GradeLevel } from "@/types";
 import { exportIndividualCSV, exportIndividualPDF } from "@/lib/export-service";
 
 interface ExportButtonsProps {
+  gradeLevels?: GradeLevel[];
   criteria: Criterion[];
   selectedGrades: SelectedGrades;
   studentNames: string[];
