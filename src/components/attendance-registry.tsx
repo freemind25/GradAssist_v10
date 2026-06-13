@@ -243,24 +243,25 @@ export function AttendanceRegistry({
         yPos += 20;
         
         const dayHeaders = recordedDays.map(day => format(day, 'd'));
-        const monthHeader = [{ content: format(new Date(year, month, 1), 'MMMM', { locale: fr }), colSpan: dayHeaders.length, styles: { halign: 'center' as const, fillColor: [240, 240, 240] as [number, number, number], textColor: 0 } }];
-        
-        const head: import('jspdf-autotable').RowInput[] = [
-            [
-                { content: 'Nom et Prénom', rowSpan: 2, styles: { valign: 'middle' as const, fillColor: [220,220,220] as [number, number, number] } },
-                ...monthHeader,
-                { content: 'Total Absences', rowSpan: 2, styles: { valign: 'middle' as const, fillColor: [255,210,210] as [number, number, number] } }
-            ],
-            dayHeaders
+        const nbDays = dayHeaders.length;
+        const lastColIdx = nbDays + 1;
+
+        // Ligne 1 : en-têtes fusionnés
+        const headRow1: import('jspdf-autotable').CellInput[] = [
+            { content: 'Nom et Prénom', rowSpan: 2, styles: { valign: 'middle' as const, fillColor: [220, 220, 220] as [number, number, number] } } as import('jspdf-autotable').CellInput,
+            { content: format(new Date(year, month, 1), 'MMMM', { locale: fr }), colSpan: nbDays, styles: { halign: 'center' as const, fillColor: [240, 240, 240] as [number, number, number], textColor: 0 } } as import('jspdf-autotable').CellInput,
+            { content: 'Total Absences', rowSpan: 2, styles: { valign: 'middle' as const, fillColor: [255, 210, 210] as [number, number, number] } } as import('jspdf-autotable').CellInput,
         ];
-        
+        // Ligne 2 : numéros des jours
+        const headRow2: import('jspdf-autotable').CellInput[] = dayHeaders.map(d => d as import('jspdf-autotable').CellInput);
+
         const body = studentReports.map(({ name, dailyStatuses, absenceCount }) => {
             const rowData = recordedDays.map(day => dailyStatuses[day.getDate()] || 'P');
-            return [ name, ...rowData, absenceCount ];
+            return [name, ...rowData, absenceCount];
         });
 
         autoTable(doc, {
-            head: head,
+            head: [headRow1, headRow2],
             body: body,
             startY: yPos,
             theme: 'grid',
@@ -268,22 +269,22 @@ export function AttendanceRegistry({
             headStyles: { fillColor: [220, 220, 220] as [number, number, number], textColor: 0, fontStyle: 'bold' as const },
             columnStyles: {
                 0: { halign: 'left' as const, fontStyle: 'bold' as const, minCellWidth: 40 },
-                [head[1].length]: { fontStyle: 'bold' as const, halign: 'center' as const, textColor: [200, 0, 0] as [number, number, number] },
+                [lastColIdx]: { fontStyle: 'bold' as const, halign: 'center' as const, textColor: [200, 0, 0] as [number, number, number] },
             },
             didParseCell: (data) => {
                 if (data.section === 'body' && data.column.index > 0 && data.column.index <= dayHeaders.length) {
                     const cellText = String(data.cell.raw);
                     if (cellText === 'A') {
-                       data.cell.styles.fillColor = '#ffcdd2';
-                       data.cell.styles.textColor = '#b71c1c';
+                        data.cell.styles.fillColor = '#ffcdd2';
+                        data.cell.styles.textColor = '#b71c1c';
                     }
                     if (cellText === 'R') {
-                       data.cell.styles.fillColor = '#ffecb3';
-                       data.cell.styles.textColor = '#e65100';
+                        data.cell.styles.fillColor = '#ffecb3';
+                        data.cell.styles.textColor = '#e65100';
                     }
-                     if (cellText === 'E') {
-                       data.cell.styles.fillColor = '#bbdefb';
-                       data.cell.styles.textColor = '#0d47a1';
+                    if (cellText === 'E') {
+                        data.cell.styles.fillColor = '#bbdefb';
+                        data.cell.styles.textColor = '#0d47a1';
                     }
                 }
             }

@@ -141,7 +141,7 @@ export function StudentProjectInfoForm({
 
         if (!Array.isArray(excelRows) || excelRows.length <= 1) { 
            toast({
-            variant: "warning",
+            variant: "destructive",
             title: "Fichier Excel Vide",
             description: "Aucun nom d'étudiant trouvé dans le fichier (après l'en-tête).",
           });
@@ -163,7 +163,7 @@ export function StudentProjectInfoForm({
 
         if (extractedNames.length === 0) {
           toast({
-            variant: "warning",
+            variant: "destructive",
             title: "Aucun Nom Trouvé",
             description: "Aucun nom d'étudiant valide trouvé. La liste reste inchangée.",
           });
