@@ -243,13 +243,13 @@ export function AttendanceRegistry({
         yPos += 20;
         
         const dayHeaders = recordedDays.map(day => format(day, 'd'));
-        const monthHeader = [{ content: format(new Date(year, month, 1), 'MMMM', { locale: fr }), colSpan: dayHeaders.length, styles: { halign: 'center', fillColor: [240, 240, 240], textColor: 0 } }];
+        const monthHeader = [{ content: format(new Date(year, month, 1), 'MMMM', { locale: fr }), colSpan: dayHeaders.length, styles: { halign: 'center', fillColor: [240, 240, 240] as [number, number, number], textColor: 0 } }];
         
         const head = [
             [
-                { content: 'Nom et Prénom', rowSpan: 2, styles: { valign: 'middle', fillColor: [220,220,220] } },
+                { content: 'Nom et Prénom', rowSpan: 2, styles: { valign: 'middle', fillColor: [220,220,220] as [number, number, number] } },
                 ...monthHeader,
-                { content: 'Total Absences', rowSpan: 2, styles: { valign: 'middle', fillColor: [255,210,210] } }
+                { content: 'Total Absences', rowSpan: 2, styles: { valign: 'middle', fillColor: [255,210,210] as [number, number, number] } }
             ],
             dayHeaders
         ];
@@ -265,7 +265,7 @@ export function AttendanceRegistry({
             startY: yPos,
             theme: 'grid',
             styles: { fontSize: 7, cellPadding: 1, halign: 'center', valign: 'middle' },
-            headStyles: { fillColor: [220, 220, 220], textColor: 0, fontStyle: 'bold' },
+            headStyles: { fillColor: [220, 220, 220] as [number, number, number], textColor: 0, fontStyle: 'bold' },
             columnStyles: {
                 0: { halign: 'left', fontStyle: 'bold', minCellWidth: 40 },
                 [head[1].length]: { fontStyle: 'bold', halign: 'center', textColor: [200, 0, 0] },

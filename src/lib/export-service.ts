@@ -188,7 +188,7 @@ export const exportIndividualPDF = (params: ExportIndividualParams): void => {
     startY: yPos + 2,
     theme: 'grid',
     styles: { halign: 'left', fontSize: 10, cellPadding: 2 },
-    headStyles: { fillColor: [30, 130, 100], textColor: 255, fontStyle: 'bold', halign: 'center' },
+    headStyles: { fillColor: [30, 130, 100] as [number, number, number], textColor: 255, fontStyle: 'bold', halign: 'center' },
     columnStyles: { 0: { cellWidth: 'auto', halign: 'left' }, 1: { cellWidth: 15, halign: 'center' }, 2: { cellWidth: 35, halign: 'center' }, 3: { cellWidth: 30, halign: 'center' } },
     didParseCell: (data) => { if (data.column.index === 0 && typeof data.cell.raw === 'string' && data.cell.raw.includes('\\n')) data.cell.styles.valign = 'middle'; }
   });
@@ -259,7 +259,7 @@ export const exportSummaryPDF = (params: ExportSummaryParams): void => {
     startY: yPos,
     theme: 'grid',
     styles: { fontSize: 7, cellPadding: 1.5 },
-    headStyles: { fillColor: [30, 130, 100], textColor: 255, fontStyle: 'bold', halign: 'center' },
+    headStyles: { fillColor: [30, 130, 100] as [number, number, number], textColor: 255, fontStyle: 'bold', halign: 'center' },
     columnStyles: { 0: { cellWidth: 8, halign: 'center' }, 1: { cellWidth: 40, halign: 'left' }, 2: { cellWidth: 40, halign: 'left' }, 3: { cellWidth: 'auto', halign: 'left' }, 4: { cellWidth: 18, halign: 'center' }, 5: { cellWidth: 20, halign: 'left' }, 6: { cellWidth: 10, halign: 'center' }, 7: { cellWidth: 16, halign: 'center' }, 8: { cellWidth: 15, halign: 'center', fontStyle: 'bold' } },
   });
 
