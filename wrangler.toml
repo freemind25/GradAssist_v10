@@ -3,3 +3,7 @@ name = "gradeassist-v10"
 pages_build_output_dir = ".next"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
+
+[env.production.vars]
+NODE_VERSION = "20.18.0"
+CYPRESS_INSTALL_BINARY = "0"
