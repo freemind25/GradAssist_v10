@@ -77,14 +77,11 @@ const getNewEvaluationModule = (type: ModuleType, name: string): EvaluationModul
       evaluationSheetTitleComplement: "...............................................................",
       criteria: DEFAULT_CRITERIA,
       attendance: {},
+      continuousAssessmentGrade: type === 'standard' ? 10 : undefined,
+      examGrade: type === 'standard' ? 10 : undefined,
+      continuousAssessmentWeight: type === 'standard' ? 40 : undefined,
     },
   };
-
-  if (type === 'standard') {
-    baseModule.evaluationData.continuousAssessmentGrade = 10;
-    baseModule.evaluationData.examGrade = 10;
-    baseModule.evaluationData.continuousAssessmentWeight = 40;
-  }
 
   return baseModule;
 };
