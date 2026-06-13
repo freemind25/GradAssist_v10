@@ -152,7 +152,7 @@ export function GradeTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="min-w-[200px] sticky left-0 bg-card z-10">Critère d'Évaluation</TableHead>
+            <TableHead className="min-w-[200px] sticky left-0 bg-card z-10">Critère d&apos;Évaluation</TableHead>
             <TableHead className="min-w-[150px]">Détails (Optionnel)</TableHead>
             <TableHead className="w-[100px] text-center">Coeff.</TableHead>
             <TableHead className="w-[200px] text-center">Note Attribuée</TableHead>

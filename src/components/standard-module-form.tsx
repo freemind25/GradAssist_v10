@@ -75,7 +75,7 @@ export function StandardModuleForm({
             
             {/* Exam */}
             <div className="space-y-2">
-                <Label htmlFor="examGrade">Note de l'Examen (/20)</Label>
+                <Label htmlFor="examGrade">Note de l&apos;Examen (/20)</Label>
                 <Input
                     id="examGrade"
                     type="number"

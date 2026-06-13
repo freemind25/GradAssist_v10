@@ -253,7 +253,7 @@ export function StudentProjectInfoForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="universityName">Nom de l'université</Label>
+          <Label htmlFor="universityName">Nom de l&apos;université</Label>
           <Input
             id="universityName"
             value={universityName}
@@ -263,7 +263,7 @@ export function StudentProjectInfoForm({
         </div>
         
         <div className="space-y-2">
-            <Label htmlFor="universityLogoInput">Logo de l'université</Label>
+            <Label htmlFor="universityLogoInput">Logo de l&apos;université</Label>
             <div className="flex items-center gap-2">
                 <Button
                     type="button"
@@ -307,7 +307,7 @@ export function StudentProjectInfoForm({
 
 
         <div className="space-y-2">
-          <Label htmlFor="establishmentName">Nom de l'établissement</Label>
+          <Label htmlFor="establishmentName">Nom de l&apos;établissement</Label>
           <Input
             id="establishmentName"
             value={establishmentName}
@@ -327,7 +327,7 @@ export function StudentProjectInfoForm({
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="studyLevel">Niveau d'étude</Label>
+          <Label htmlFor="studyLevel">Niveau d&apos;étude</Label>
           <Select
             value={studyLevel}
             onValueChange={(value) => {
