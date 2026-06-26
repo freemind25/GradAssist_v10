@@ -2,7 +2,7 @@
 "use client";
 
 import type * as React from 'react';
-import { useCallback, useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import type { EvaluationModule as EvaluationModuleType, EvaluationData, Criterion } from '@/types';
 import { StudentProjectInfoForm } from '@/components/student-project-info-form';
 import { GradeTable } from '@/components/grade-table';
@@ -11,7 +11,7 @@ import { ExportButtons } from '@/components/export-buttons';
 import { Button } from '@/components/ui/button';
 import { gradeLevels, TARGET_SUM_COEFFICIENTS, DEFAULT_CRITERIA } from '@/config/grading-config';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, FilePlus2, PlusCircle, Save } from 'lucide-react';
+import { AlertCircle, FilePlus2, PlusCircle } from 'lucide-react';
 import { AttendanceRegistry } from './attendance-registry';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { SummaryExportButtons } from './summary-export-buttons';
@@ -20,11 +20,12 @@ import { useToast } from '@/hooks/use-toast';
 interface EvaluationModuleProps {
     module: EvaluationModuleType;
     onUpdate: (update: Partial<EvaluationData>) => void;
+    onSummaryUpdate: (summaryEvaluations: EvaluationData[]) => void;
 }
 
-export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
+export function EvaluationModule({ module, onUpdate, onSummaryUpdate }: EvaluationModuleProps) {
     const { toast } = useToast();
-    const [allSavedEvaluations, setAllSavedEvaluations] = useState<EvaluationData[]>([]);
+    const allSavedEvaluations = module.summaryEvaluations ?? [];
 
     const updateField = <K extends keyof EvaluationData>(field: K, value: EvaluationData[K]) => {
         onUpdate({ [field]: value });
@@ -67,7 +68,7 @@ export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
         
         // Add to the summary list
         const newSummary = [...allSavedEvaluations, evaluationSnapshot];
-        setAllSavedEvaluations(newSummary);
+        onSummaryUpdate(newSummary);
 
         // Create a fresh default evaluation data object
         const newId = `eval_${Date.now()}`;

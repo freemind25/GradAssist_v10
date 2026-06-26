@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { useMemo } from 'react';
+import { calculateStandardFinalGrade } from "@/lib/grading";
 
 interface StandardModuleFormProps {
   continuousAssessmentGrade: number;
@@ -28,14 +29,7 @@ export function StandardModuleForm({
   const examWeight = 100 - continuousAssessmentWeight;
 
   const finalGrade = useMemo(() => {
-    const cc = continuousAssessmentGrade ?? 0;
-    const exam = examGrade ?? 0;
-    const ccWeight = continuousAssessmentWeight / 100;
-    const examWeight = (100 - continuousAssessmentWeight) / 100;
-    
-    if (cc < 0 || cc > 20 || exam < 0 || exam > 20) return 0;
-    
-    return (cc * ccWeight) + (exam * examWeight);
+    return calculateStandardFinalGrade(continuousAssessmentGrade, examGrade, continuousAssessmentWeight);
   }, [continuousAssessmentGrade, examGrade, continuousAssessmentWeight]);
   
   const handleWeightChange = (value: number[]) => {

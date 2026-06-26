@@ -65,4 +65,5 @@ export interface EvaluationModule {
   name: string;
   type: ModuleType;
   evaluationData: EvaluationData;
+  summaryEvaluations?: EvaluationData[];
 }

@@ -6,8 +6,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Criterion, SelectedGrades, EvaluationData } from "@/types";
 import { toast } from "@/hooks/use-toast";
+import { getPointsForSelectedGrade, NON_NOTE_VALUE } from "@/lib/grading";
 
-const NON_NOTE_VALUE = "__NONE__";
 const BASE_DOCUMENT_TITLE_PREFIX = "Fiche d'évaluation des travaux de l'atelier";
 
 interface ExportIndividualParams {
@@ -36,13 +36,7 @@ interface ExportSummaryParams {
   moduleName: string;
 }
 
-const getPointsForSelectedGrade = (selectedGradeStr: string | undefined): number => {
-  if (!selectedGradeStr || selectedGradeStr === NON_NOTE_VALUE) return 0;
-  const points = parseFloat(selectedGradeStr);
-  return isNaN(points) ? 0 : points;
-};
-
-const generateFileNameBase = (studentNames: string[], prefix = "evaluation"): string => {
+const generateFileNameBase = (studentNames: string[]): string => {
   const primaryStudentName = (studentNames[0] || 'etudiant').replace(/\s+/g, '_');
   return studentNames.length > 1 ? `${primaryStudentName}_et_autres` : primaryStudentName;
 };
@@ -92,28 +86,44 @@ const downloadFile = (content: string, filename: string): void => {
   document.body.removeChild(link);
 };
 
+const csvCell = (value: string | number | null | undefined): string => {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+};
+
+const csvRow = (cells: Array<string | number | null | undefined>): string => {
+  return `${cells.map(csvCell).join(",")}\n`;
+};
+
 export const exportIndividualCSV = (params: ExportIndividualParams): void => {
   const { criteria, selectedGrades, studentNames, teacherNames, projectName, studyLevel, studySubLevel, session, academicYear, universityName, establishmentName, departmentName, masterSpecialty, universityLogo, totalPoints, maxTotalPoints, evaluationSheetTitleComplement } = params;
 
-  let csv = `data:text/csv;charset=utf-8,${getDocumentTitle(evaluationSheetTitleComplement)}\n`;
-  if (universityLogo) csv += "Logo Université:,(Logo fourni)\n";
-  csv += `Université:,"${universityName || 'N/A'}"\nÉtablissement:,"${establishmentName || 'N/A'}"\nDépartement:,"${departmentName || 'N/A'}"\n`;
-  csv += `Niveau d'étude:,"${studyLevel ? `${studyLevel} - ${studySubLevel}` : 'N/A'}"\n`;
-  if (studyLevel === "Master") csv += `Spécialité Master:,"${masterSpecialty || 'N/A'}"\n`;
+  let csv = `data:text/csv;charset=utf-8,${csvRow([getDocumentTitle(evaluationSheetTitleComplement)])}`;
+  if (universityLogo) csv += csvRow(["Logo Université:", "(Logo fourni)"]);
+  csv += csvRow(["Université:", universityName || "N/A"]);
+  csv += csvRow(["Établissement:", establishmentName || "N/A"]);
+  csv += csvRow(["Département:", departmentName || "N/A"]);
+  csv += csvRow(["Niveau d'étude:", studyLevel ? `${studyLevel} - ${studySubLevel}` : "N/A"]);
+  if (studyLevel === "Master") csv += csvRow(["Spécialité Master:", masterSpecialty || "N/A"]);
   
-  csv += `Nom de l'étudiant(e/s):,"${studentNames.filter(n => n.trim()).join(', ') || 'N/A'}"\n`;
-  csv += `Nom de l'enseignant(e/s):,"${teacherNames.filter(n => n.trim()).join(', ') || 'N/A'}"\n`;
-  csv += `Intitulé du Projet:,"${projectName || 'N/A'}"\nSession:,"${session || 'N/A'}"\nAnnée Universitaire:,"${academicYear || 'N/A'}"\n\n`;
-  csv += "Critère,Coefficient,Note Attribuée,Points Obtenus\n";
+  csv += csvRow(["Nom de l'étudiant(e/s):", studentNames.filter(n => n.trim()).join(", ") || "N/A"]);
+  csv += csvRow(["Nom de l'enseignant(e/s):", teacherNames.filter(n => n.trim()).join(", ") || "N/A"]);
+  csv += csvRow(["Intitulé du Projet:", projectName || "N/A"]);
+  csv += csvRow(["Session:", session || "N/A"]);
+  csv += csvRow(["Année Universitaire:", academicYear || "N/A"]);
+  csv += "\n";
+  csv += csvRow(["Critère", "Coefficient", "Note Attribuée", "Points Obtenus"]);
 
   criteria.forEach(c => {
     const grade = selectedGrades[c.id];
     const displayGrade = (grade && grade !== NON_NOTE_VALUE && c.coefficient > 0) ? grade : "N/A";
     const points = c.coefficient > 0 ? getPointsForSelectedGrade(grade) : 0;
-    csv += `"${c.name}",${c.coefficient},${displayGrade},${points.toFixed(2)}\n`;
+    csv += csvRow([c.name, c.coefficient, displayGrade, points.toFixed(2)]);
   });
 
-  csv += `\nTotal des Points,""," ",${totalPoints.toFixed(2)}\nSur,""," ",${maxTotalPoints.toFixed(2)}\n`;
+  csv += "\n";
+  csv += csvRow(["Total des Points", "", " ", totalPoints.toFixed(2)]);
+  csv += csvRow(["Sur", "", " ", maxTotalPoints.toFixed(2)]);
   downloadFile(csv, `evaluation_${generateFileNameBase(studentNames)}.csv`);
   toast({ title: "Succès", description: "Fichier CSV exporté." });
 };
@@ -127,18 +137,21 @@ export const exportSummaryCSV = (params: ExportSummaryParams): void => {
   }
 
   const first = allEvaluations[0];
-  let csv = `data:text/csv;charset=utf-8,Synthèse des Évaluations - ${moduleName}\n`;
+  let csv = `data:text/csv;charset=utf-8,${csvRow([`Synthèse des Évaluations - ${moduleName}`])}`;
   if (first.evaluationSheetTitleComplement && first.evaluationSheetTitleComplement !== "...............................................................") {
-    csv += `Contexte:,"${first.evaluationSheetTitleComplement}"\n`;
+    csv += csvRow(["Contexte:", first.evaluationSheetTitleComplement]);
   }
-  csv += `Université:,"${first.universityName || 'N/A'}"\nÉtablissement:,"${first.establishmentName || 'N/A'}"\nDépartement:,"${first.departmentName || 'N/A'}"\n\n`;
-  csv += "N°,Nom de l'étudiant(e/s),Nom de l'enseignant(e/s),Intitulé du Projet,Niveau d'étude,Spécialité Master,Session,Année Universitaire,Note Finale,Sur\n";
+  csv += csvRow(["Université:", first.universityName || "N/A"]);
+  csv += csvRow(["Établissement:", first.establishmentName || "N/A"]);
+  csv += csvRow(["Département:", first.departmentName || "N/A"]);
+  csv += "\n";
+  csv += csvRow(["N°", "Nom de l'étudiant(e/s)", "Nom de l'enseignant(e/s)", "Intitulé du Projet", "Niveau d'étude", "Spécialité Master", "Session", "Année Universitaire", "Note Finale", "Sur"]);
 
   allEvaluations.forEach((e, i) => {
     const students = e.studentNames.filter(n => n.trim()).join(' & ') || 'N/A';
     const teachers = e.teacherNames.filter(n => n.trim()).join(' & ') || 'N/A';
     const level = e.studyLevel ? `${e.studyLevel} - ${e.studySubLevel}` : 'N/A';
-    csv += `${i + 1},"${students}","${teachers}","${e.projectName || 'N/A'}","${level}","${e.masterSpecialty || 'N/A'}","${e.session || 'N/A'}","${e.academicYear || 'N/A'}",${e.totalPoints.toFixed(2)},${maxTotalPoints.toFixed(2)}\n`;
+    csv += csvRow([i + 1, students, teachers, e.projectName || "N/A", level, e.masterSpecialty || "N/A", e.session || "N/A", e.academicYear || "N/A", e.totalPoints.toFixed(2), maxTotalPoints.toFixed(2)]);
   });
 
   downloadFile(csv, `${generateSummaryFileNameBase(moduleName)}.csv`);

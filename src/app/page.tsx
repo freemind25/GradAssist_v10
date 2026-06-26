@@ -5,11 +5,17 @@ import type * as React from 'react';
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { BookCopy, Plus, FolderPlus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DEFAULT_CRITERIA, TARGET_SUM_COEFFICIENTS } from "@/config/grading-config";
 import type { EvaluationData, EvaluationModule as EvaluationModuleType, ModuleType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { EvaluationModule } from '@/components/evaluation-module';
+import { calculateAtelierTotalPoints } from "@/lib/grading";
+import {
+  createEvaluationModule,
+  loadPersistedActiveModuleId,
+  loadPersistedModules,
+  savePersistedState,
+} from "@/lib/persistence";
 import {
   Menubar,
   MenubarContent,
@@ -48,43 +54,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-
-const LOCALSTORAGE_MODULES_KEY = 'gradeAssist_modules';
-const LOCALSTORAGE_ACTIVE_MODULE_ID_KEY = 'gradeAssist_activeModuleId';
-
-const getNewEvaluationModule = (type: ModuleType, name: string): EvaluationModuleType => {
-  const baseModule = {
-    id: `module_${Date.now()}`,
-    name: name,
-    type: type,
-    evaluationData: {
-      id: `eval_${Date.now()}`,
-      studentNames: ["Étudiant 1", "Étudiant 2", "Étudiant 3"],
-      teacherNames: [""],
-      projectName: "",
-      studyLevel: "",
-      studySubLevel: "",
-      session: "",
-      academicYear: "",
-      universityName: "",
-      establishmentName: "",
-      departmentName: "",
-      masterSpecialty: "",
-      universityLogo: null,
-      selectedGrades: {},
-      totalPoints: 0,
-      evaluationSheetTitleComplement: "...............................................................",
-      criteria: DEFAULT_CRITERIA,
-      attendance: {},
-      continuousAssessmentGrade: type === 'standard' ? 10 : undefined,
-      examGrade: type === 'standard' ? 10 : undefined,
-      continuousAssessmentWeight: type === 'standard' ? 40 : undefined,
-    },
-  };
-
-  return baseModule;
-};
 
 
 function NewModuleDialog({ onCreate, trigger }: { onCreate: (name: string, type: ModuleType) => void, trigger?: React.ReactNode }) {
@@ -179,21 +148,15 @@ export default function GradeAssistPage() {
 
   useEffect(() => {
     try {
-      const modulesData = localStorage.getItem(LOCALSTORAGE_MODULES_KEY);
-      const activeIdData = localStorage.getItem(LOCALSTORAGE_ACTIVE_MODULE_ID_KEY);
-      
-      let loadedModules: EvaluationModuleType[] = [];
-      if (modulesData) {
-        loadedModules = JSON.parse(modulesData);
-      }
+      let loadedModules = loadPersistedModules();
       
       if (!Array.isArray(loadedModules) || loadedModules.length === 0) {
-        loadedModules = [getNewEvaluationModule('atelier', 'Atelier Projet de Ville 1')];
+        loadedModules = [createEvaluationModule('atelier', 'Atelier Projet de Ville 1')];
       }
       
       setModules(loadedModules);
 
-      let activeId = activeIdData ? JSON.parse(activeIdData) : null;
+      let activeId = loadPersistedActiveModuleId();
       if (!activeId || !loadedModules.some(m => m.id === activeId)) {
         activeId = loadedModules[0]?.id || null;
       }
@@ -206,7 +169,7 @@ export default function GradeAssistPage() {
         title: "Erreur de chargement",
         description: "Impossible de charger les données locales. L'application a été réinitialisée avec les données par défaut.",
       });
-      const defaultModule = getNewEvaluationModule('atelier', 'Atelier Projet de Ville 1');
+      const defaultModule = createEvaluationModule('atelier', 'Atelier Projet de Ville 1');
       setModules([defaultModule]);
       setActiveModuleId(defaultModule.id);
     } finally {
@@ -218,8 +181,7 @@ export default function GradeAssistPage() {
     if (!isLoaded) return;
     const handler = setTimeout(() => {
       try {
-        localStorage.setItem(LOCALSTORAGE_MODULES_KEY, JSON.stringify(modules));
-        localStorage.setItem(LOCALSTORAGE_ACTIVE_MODULE_ID_KEY, JSON.stringify(activeModuleId));
+        savePersistedState(modules, activeModuleId);
       } catch (error) {
         console.error("Failed to save data to localStorage:", error);
       }
@@ -236,15 +198,7 @@ export default function GradeAssistPage() {
           const updatedData = { ...module.evaluationData, ...update };
           
           if (module.type === 'atelier' && (update.criteria || update.selectedGrades)) {
-            const newTotalPoints = updatedData.criteria.reduce((sum, criterion) => {
-              const numericGradeStr = updatedData.selectedGrades[criterion.id];
-              if (numericGradeStr && numericGradeStr !== "__NONE__") {
-                const points = parseFloat(numericGradeStr);
-                return sum + (isNaN(points) ? 0 : points);
-              }
-              return sum;
-            }, 0);
-            updatedData.totalPoints = newTotalPoints;
+            updatedData.totalPoints = calculateAtelierTotalPoints(updatedData.criteria, updatedData.selectedGrades);
           }
           return { ...module, evaluationData: updatedData };
         }
@@ -254,7 +208,7 @@ export default function GradeAssistPage() {
   }, []);
 
   const handleCreateModule = useCallback((name: string, type: ModuleType) => {
-    const newModule = getNewEvaluationModule(type, name);
+    const newModule = createEvaluationModule(type, name);
     if (activeModule) {
       newModule.evaluationData.universityName = activeModule.evaluationData.universityName;
       newModule.evaluationData.establishmentName = activeModule.evaluationData.establishmentName;
@@ -418,6 +372,11 @@ export default function GradeAssistPage() {
             key={activeModule.id}
             module={activeModule}
             onUpdate={(update) => handleUpdateModule(activeModule.id, update)}
+            onSummaryUpdate={(summaryEvaluations) => {
+                setModules(prevModules => prevModules.map(module => (
+                    module.id === activeModule.id ? { ...module, summaryEvaluations } : module
+                )));
+            }}
         />
       
         <footer className="text-center text-sm text-muted-foreground py-8">
