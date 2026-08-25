@@ -148,105 +148,136 @@ export function GradeTable({
 
 
   return (
-    <div className="overflow-x-auto rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="min-w-[200px] sticky left-0 bg-card z-10">Critère d&apos;Évaluation</TableHead>
-            <TableHead className="min-w-[150px]">Détails (Optionnel)</TableHead>
-            <TableHead className="w-[100px] text-center">Coeff.</TableHead>
-            <TableHead className="w-[200px] text-center">Note Attribuée</TableHead>
-            <TableHead className="w-[100px] text-center">Points Obtenus</TableHead>
-            <TableHead className="w-[80px] text-center">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {criteria.map((criterion) => {
-            const criterionOptions = memoizedGradeOptions[criterion.id] || [];
-            const isCoefficientZero = criterion.coefficient === 0;
-            return (
-              <TableRow key={criterion.id}>
-                <TableCell className="font-medium sticky left-0 bg-card z-10 py-1">
-                  <Input
-                    value={criterion.name}
-                    onChange={(e) => onUpdateCriterion(criterion.id, 'name', e.target.value)}
-                    className="h-9 text-sm"
-                    placeholder="Nom du critère"
-                  />
-                </TableCell>
-                <TableCell className="py-1">
-                  <Input
-                    value={criterion.details || ""}
-                    onChange={(e) => onUpdateCriterion(criterion.id, 'details', e.target.value)}
-                    className="h-9 text-sm"
-                    placeholder="Détails"
-                  />
-                </TableCell>
-                <TableCell className="text-center py-1">
-                  <Input
-                    type="number"
-                    value={criterion.coefficient}
-                    onChange={(e) => onUpdateCriterion(criterion.id, 'coefficient', parseFloat(e.target.value) || 0)}
-                    className="h-9 w-20 text-center text-sm"
-                    min="0"
-                    step="0.5"
-                  />
-                </TableCell>
-                <TableCell className="text-center p-1">
-                  <Select
-                    value={isCoefficientZero ? NON_NOTE_VALUE : (selectedGrades[criterion.id] || "")} 
-                    onValueChange={(value) => onGradeSelect(criterion.id, value)}
-                    disabled={isCoefficientZero}
-                  >
-                    <SelectTrigger 
-                      className={cn(
-                        "w-full h-9 min-w-[120px] text-sm",
-                         isCoefficientZero ? "bg-muted hover:bg-muted/80" : getSelectTriggerClassName(selectedGrades[criterion.id], criterion)
-                      )}
-                      aria-label={`Select grade for ${criterion.name}`}
-                    >
-                      <SelectValue placeholder={isCoefficientZero ? "N/A (Coeff. 0)" : "Choisir..."} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {!isCoefficientZero && <SelectItem value={NON_NOTE_VALUE}>-- Non Noté --</SelectItem>}
-                      {criterionOptions.map(group => (
-                        <SelectGroup key={group.label}>
-                          <SelectLabel>{group.label}</SelectLabel>
-                          {group.options.map(option => (
-                            <SelectItem key={`${criterion.id}-${group.label}-${option.value}`} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      ))}
-                       {isCoefficientZero && <SelectItem value={NON_NOTE_VALUE} disabled>N/A (Coeff. 0)</SelectItem>}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell className="text-center font-semibold">
-                  {isCoefficientZero ? "0.00" : getPointsForCriterion(selectedGrades[criterion.id]).toFixed(2)}
-                </TableCell>
-                <TableCell className="text-center py-1">
-                  <Button variant="ghost" size="icon" onClick={() => onRemoveCriterion(criterion.id)} aria-label="Supprimer critère">
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-        <TableFooter>
-            <TableRow>
-                <TableCell colSpan={2} className="text-right font-medium">Total Coefficients Actuel:</TableCell>
-                <TableCell className="text-center font-bold text-lg">
-                    {currentLocalCoefficientSum.toFixed(2)}
-                </TableCell>
-                <TableCell colSpan={3} className={`text-left font-medium text-sm ${currentLocalCoefficientSum !== TARGET_SUM_COEFFICIENTS ? 'text-destructive' : ''}`}>
-                    (Objectif: {TARGET_SUM_COEFFICIENTS.toFixed(2)})
-                </TableCell>
+    <div className="space-y-3">
+      <div className="overflow-x-auto rounded-xl border bg-card card-premium">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
+              <TableHead className="min-w-[200px] sticky left-0 bg-muted/50 z-10 font-semibold text-foreground">Critère</TableHead>
+              <TableHead className="min-w-[140px] font-semibold text-foreground">Détails</TableHead>
+              <TableHead className="w-[90px] text-center font-semibold text-foreground">Coeff.</TableHead>
+              <TableHead className="w-[200px] text-center font-semibold text-foreground">Note</TableHead>
+              <TableHead className="w-[100px] text-center font-semibold text-foreground">Points</TableHead>
+              <TableHead className="w-[60px] text-center font-semibold text-foreground">×</TableHead>
             </TableRow>
-        </TableFooter>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {criteria.map((criterion) => {
+              const criterionOptions = memoizedGradeOptions[criterion.id] || [];
+              const isCoefficientZero = criterion.coefficient === 0;
+              const points = getPointsForCriterion(selectedGrades[criterion.id]);
+              const maxPoints = criterion.coefficient;
+              const pointPct = maxPoints > 0 ? (points / maxPoints) * 100 : 0;
+              return (
+                <TableRow key={criterion.id} className="table-row-premium">
+                  <TableCell className="font-medium sticky left-0 bg-card z-10 py-2">
+                    <Input
+                      value={criterion.name}
+                      onChange={(e) => onUpdateCriterion(criterion.id, 'name', e.target.value)}
+                      className="h-9 text-sm font-medium border-border/60 focus:border-primary/40"
+                      placeholder="Nom du critère"
+                    />
+                  </TableCell>
+                  <TableCell className="py-2">
+                    <Input
+                      value={criterion.details || ""}
+                      onChange={(e) => onUpdateCriterion(criterion.id, 'details', e.target.value)}
+                      className="h-9 text-sm border-border/60 focus:border-primary/40"
+                      placeholder="Optionnel"
+                    />
+                  </TableCell>
+                  <TableCell className="text-center py-2">
+                    <Input
+                      type="number"
+                      value={criterion.coefficient}
+                      onChange={(e) => onUpdateCriterion(criterion.id, 'coefficient', parseFloat(e.target.value) || 0)}
+                      className="h-9 w-16 mx-auto text-center text-sm font-semibold border-border/60 focus:border-primary/40"
+                      min="0"
+                      step="0.5"
+                    />
+                  </TableCell>
+                  <TableCell className="text-center p-1.5">
+                    <Select
+                      value={isCoefficientZero ? NON_NOTE_VALUE : (selectedGrades[criterion.id] || "")} 
+                      onValueChange={(value) => onGradeSelect(criterion.id, value)}
+                      disabled={isCoefficientZero}
+                    >
+                      <SelectTrigger 
+                        className={cn(
+                          "w-full h-9 min-w-[120px] text-sm font-semibold border-border/60",
+                           isCoefficientZero ? "bg-muted hover:bg-muted/80" : getSelectTriggerClassName(selectedGrades[criterion.id], criterion)
+                        )}
+                        aria-label={`Select grade for ${criterion.name}`}
+                      >
+                        <SelectValue placeholder={isCoefficientZero ? "N/A" : "Choisir..."} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {!isCoefficientZero && <SelectItem value={NON_NOTE_VALUE}>— Non Noté —</SelectItem>}
+                        {criterionOptions.map(group => (
+                          <SelectGroup key={group.label}>
+                            <SelectLabel className="text-xs font-semibold text-muted-foreground">{group.label}</SelectLabel>
+                            {group.options.map(option => (
+                              <SelectItem key={`${criterion.id}-${group.label}-${option.value}`} value={option.value}>
+                                <span className="font-mono">{option.label}</span>
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        ))}
+                         {isCoefficientZero && <SelectItem value={NON_NOTE_VALUE} disabled>N/A (Coeff. 0)</SelectItem>}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell className="text-center py-2">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="font-bold text-sm">
+                        {isCoefficientZero ? "0.00" : points.toFixed(2)}
+                      </span>
+                      {!isCoefficientZero && maxPoints > 0 && (
+                        <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all duration-500",
+                              pointPct >= 80 ? "bg-emerald-500" :
+                              pointPct >= 60 ? "bg-accent" :
+                              pointPct >= 40 ? "bg-orange-400" : "bg-destructive"
+                            )}
+                            style={{ width: `${pointPct}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center py-2">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 opacity-40 hover:opacity-100" onClick={() => onRemoveCriterion(criterion.id)} aria-label="Supprimer critère">
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+      {/* Coefficient progress bar */}
+      <div className="flex items-center gap-3 text-sm">
+        <span className="text-muted-foreground font-medium">Coefficients :</span>
+        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden max-w-xs">
+          <div
+            className={cn(
+              "h-full rounded-full transition-all duration-500 progress-glow",
+              currentLocalCoefficientSum === TARGET_SUM_COEFFICIENTS ? "bg-emerald-500" :
+              currentLocalCoefficientSum > TARGET_SUM_COEFFICIENTS ? "bg-destructive" : "bg-accent"
+            )}
+            style={{ width: `${Math.min((currentLocalCoefficientSum / TARGET_SUM_COEFFICIENTS) * 100, 100)}%` }}
+          />
+        </div>
+        <span className={cn(
+          "font-bold tabular-nums",
+          currentLocalCoefficientSum !== TARGET_SUM_COEFFICIENTS ? 'text-destructive' : 'text-emerald-600'
+        )}>
+          {currentLocalCoefficientSum.toFixed(1)} / {TARGET_SUM_COEFFICIENTS.toFixed(0)}
+        </span>
+      </div>
     </div>
   );
 }

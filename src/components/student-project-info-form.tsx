@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, PlusCircle, MinusCircle, ImageUp, XCircle, UserPlus, UserMinus } from "lucide-react";
+import { Upload, PlusCircle, MinusCircle, ImageUp, XCircle, UserPlus, UserMinus, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface StudentProjectInfoFormProps {
@@ -38,13 +38,12 @@ interface StudentProjectInfoFormProps {
   setMasterSpecialty: (specialty: string) => void;
   universityLogo: string | null;
   setUniversityLogo: (logo: string | null) => void;
-  evaluationSheetTitleComplement: string;
-  setEvaluationSheetTitleComplement: (complement: string) => void;
+  adminEmail?: string;
+  setAdminEmail?: (email: string) => void;
 }
 
 const MAX_TEACHERS = 3;
 const PLACEHOLDER_SESSION_VALUE = "__SELECT_LEVEL_FIRST__";
-const BASE_EVALUATION_TITLE_PREFIX = "Fiche d'évaluation des travaux de l'atelier";
 
 
 export function StudentProjectInfoForm({
@@ -72,8 +71,8 @@ export function StudentProjectInfoForm({
   setMasterSpecialty,
   universityLogo,
   setUniversityLogo,
-  evaluationSheetTitleComplement,
-  setEvaluationSheetTitleComplement,
+  adminEmail = "",
+  setAdminEmail,
 }: StudentProjectInfoFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -235,23 +234,12 @@ export function StudentProjectInfoForm({
   const availableSubLevels = studyLevel === "Licence" ? licenceSubLevels : studyLevel === "Master" ? masterSubLevels : [];
 
   return (
-    <Card className="shadow-lg">
-      <CardHeader>
-        <CardTitle className="text-xl">Informations Générales</CardTitle>
+    <Card className="card-premium overflow-hidden">
+      <div className="h-1 bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
+      <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent">
+        <CardTitle className="text-lg">Informations Générales</CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="evaluationSheetTitleComplement">
-              {BASE_EVALUATION_TITLE_PREFIX}
-            </Label>
-            <Input
-              id="evaluationSheetTitleComplement"
-              value={evaluationSheetTitleComplement}
-              onChange={(e) => setEvaluationSheetTitleComplement(e.target.value)}
-              placeholder="Compléter ici (ex: Session Printemps 2024 - Groupe A)"
-            />
-        </div>
-
         <div className="space-y-2">
           <Label htmlFor="universityName">Nom de l&apos;université</Label>
           <Input
@@ -471,6 +459,24 @@ export function StudentProjectInfoForm({
           )}
         </div>
         
+        <div className="space-y-2">
+          <Label htmlFor="adminEmail">Email de l&apos;administration</Label>
+          <div className="relative">
+            <Input
+              id="adminEmail"
+              type="email"
+              value={adminEmail}
+              onChange={(e) => setAdminEmail?.(e.target.value)}
+              placeholder="dep-info@univ.dz"
+              className="pl-9"
+            />
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Adresse email pour l&apos;envoi des rapports mensuels d&apos;absences.
+          </p>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="projectName">Intitulé du Projet</Label>
           <Input

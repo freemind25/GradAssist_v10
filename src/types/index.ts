@@ -17,6 +17,35 @@ export interface SelectedGrades {
   [criterionId: string]: string | undefined; // Stores the selected NUMERIC grade string (e.g., "3.5") or undefined if not graded
 }
 
+export type EventType = 'consultation' | 'chapter_deadline' | 'meeting' | 'review' | 'reminder' | 'other';
+
+export interface SupervisionEvent {
+  id: string;
+  title: string;
+  type: EventType;
+  date: string;       // ISO date string YYYY-MM-DD
+  time: string;       // HH:MM
+  description: string;
+  completed: boolean;
+}
+
+export interface ThesisStudent {
+  id: string;
+  firstName: string;
+  lastName: string;
+  title: string;
+  advisor: string;
+  coAdvisor: string;
+  progress: number; // 0-100
+  status: 'en cours' | 'en rédaction' | 'soutenu' | 'abandonné';
+  startDate: string;
+  defenseDate: string;
+  description: string;
+  keywords: string;
+  events: SupervisionEvent[];
+  email: string;
+}
+
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 
 export interface AttendanceRecord {
@@ -56,6 +85,32 @@ export interface EvaluationData {
 
   // Common fields
   evaluationSheetTitleComplement: string;
+  adminEmail: string;
+
+  // Encadrement (thesis supervision)
+  thesisStudents: ThesisStudent[];
+
+  // Canevas de cours
+  syllabus: CourseSyllabus;
+}
+
+export type ChapterStatus = 'not_started' | 'in_progress' | 'completed';
+
+export interface SyllabusChapter {
+  id: string;
+  title: string;
+  order: number;
+  status: ChapterStatus;
+  plannedDate: string;    // YYYY-MM-DD
+  plannedEndDate: string; // YYYY-MM-DD
+  notes: string;
+  subchapters: SyllabusChapter[];
+}
+
+export interface CourseSyllabus {
+  chapters: SyllabusChapter[];
+  pdfFileName: string | null;
+  pdfDataUrl: string | null; // stored as base64 data URL
 }
 
 export type ModuleType = 'atelier' | 'standard';

@@ -16,8 +16,8 @@
     "cy:run": "cypress run",
     "cy:run:smoke": "cypress run --spec \"cypress/e2e/00-smoke.cy.ts\"",
     "electron:dev": "next build && node scripts/copy-standalone.js && electron .",
-    "electron:build": "next build && node scripts/copy-standalone.js && electron-builder --win",
-    "electron:pack": "next build && node scripts/copy-standalone.js && electron-builder --win --dir"
+    "electron:build": "next build && node scripts/copy-standalone.js && electron-builder --win --publish never",
+    "electron:pack": "next build && node scripts/copy-standalone.js && electron-builder --win --dir --publish never"
   },
   "description": "Application de gestion des notes",
   "author": "GradeAssist Team",
@@ -33,18 +33,8 @@
     ],
     "extraResources": [
       {
-        "from": ".next/standalone",
+        "from": "electron/standalone",
         "to": "app",
-        "filter": ["**/*"]
-      },
-      {
-        "from": ".next/static",
-        "to": "app/.next/static",
-        "filter": ["**/*"]
-      },
-      {
-        "from": "public",
-        "to": "app/public",
         "filter": ["**/*"]
       }
     ],
@@ -106,6 +96,7 @@
     "lucide-react": "^0.475.0",
     "next": "15.2.8",
     "patch-package": "^8.0.0",
+    "pdfjs-dist": "^6.2.108",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",

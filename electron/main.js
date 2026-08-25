@@ -1,147 +1,179 @@
-const { app, BrowserWindow } = require('electron');
-const path = require('path');
-const { spawn } = require('child_process');
+const { app, BrowserWindow } = require("electron");
+const http = require("http");
+const path = require("path");
+const fs = require("fs");
 
-let mainWindow;
-let serverProcess;
+const isDev = !app.isPackaged;
 
-const PORT = 3456;
-const HOST = '127.0.0.1';
-const APP_URL = `http://${HOST}:${PORT}`;
+let mainWindow = null;
+let server = null;
 
-function startServer() {
-  return new Promise((resolve, reject) => {
-    // Path to the standalone server.js inside resources/app/
-    const serverPath = path.join(process.resourcesPath, 'app', 'server.js');
+const PORT = 8347;
 
-    const env = {
-      ...process.env,
-      HOSTNAME: HOST,
-      PORT: String(PORT),
-      NODE_ENV: 'production'
-    };
+// ── MIME types for static assets ──────────────────────────────────────────────
+const MIME = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".mjs": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
+  ".eot": "application/vnd.ms-fontobject",
+  ".webp": "image/webp",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
+  ".txt": "text/plain; charset=utf-8",
+  ".xml": "application/xml; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
+};
 
-    serverProcess = spawn(process.execPath, [serverPath], {
-      env,
-      cwd: path.join(process.resourcesPath, 'app'),
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
+function mimeFor(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  return MIME[ext] || "application/octet-stream";
+}
 
-    let serverOutput = '';
-    serverProcess.stdout.on('data', (data) => {
-      const text = data.toString();
-      serverOutput += text;
-      console.log('[server stdout]', text.trim());
-    });
+// ── Resolve the standalone app root ───────────────────────────────────────────
+function getStandaloneRoot() {
+  if (isDev) {
+    // In dev mode, the standalone output is at .next/standalone/
+    return path.join(__dirname, "..", ".next", "standalone");
+  }
+  // In production (packaged), the standalone files are in extraResources → app/
+  return path.join(process.resourcesPath, "app");
+}
 
-    serverProcess.stderr.on('data', (data) => {
-      const text = data.toString();
-      serverOutput += text;
-      console.log('[server stderr]', text.trim());
-    });
-
-    serverProcess.on('error', (err) => {
-      console.error('Failed to start server:', err);
-      reject(new Error('Failed to start server: ' + err.message));
-    });
-
-    serverProcess.on('exit', (code) => {
-      console.log(`Server process exited with code ${code}`);
-      if (code !== 0 && code !== null) {
-        reject(new Error(`Server exited with code ${code}`));
-      }
-    });
-
-    // Poll until server responds
-    const maxAttempts = 60; // 60 * 500ms = 30 seconds
-    let attempts = 0;
-
-    const pollInterval = setInterval(() => {
-      attempts++;
-
-      const http = require('http');
-      const req = http.get(APP_URL, (res) => {
-        clearInterval(pollInterval);
-        console.log(`Server responded after ${attempts} attempts`);
-        resolve();
-      });
-
-      req.on('error', () => {
-        if (attempts >= maxAttempts) {
-          clearInterval(pollInterval);
-          const err = new Error(
-            'Server did not respond\n' +
-            'Vérifiez que le port ' + PORT + " n'est pas utilisé.\n" +
-            'Detail: Server did not respond'
-          );
-          console.error(err.message);
-          console.error('Server output:', serverOutput.slice(-2000));
-          reject(err);
-        }
-      });
-
-      req.setTimeout(1000);
-    }, 500);
+// ── Serve a static file ───────────────────────────────────────────────────────
+function serveFile(res, filePath) {
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404);
+      res.end("Not Found");
+      return;
+    }
+    res.writeHead(200, { "Content-Type": mimeFor(filePath) });
+    res.end(data);
   });
 }
 
+// ── Local HTTP server that mimics Next.js file-serving ────────────────────────
+function startServer() {
+  const root = getStandaloneRoot();
+
+  server = http.createServer((req, res) => {
+    const url = new URL(req.url, `http://localhost:${PORT}`);
+    let pathname = decodeURIComponent(url.pathname);
+
+    // 1. Try exact file match (static assets, _next/static, public/)
+    let candidate = path.join(root, pathname);
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+      return serveFile(res, candidate);
+    }
+
+    // 2. Try pathname.html
+    candidate = path.join(root, pathname + ".html");
+    if (fs.existsSync(candidate)) {
+      return serveFile(res, candidate);
+    }
+
+    // 3. Try pathname/index.html (for directory index)
+    candidate = path.join(root, pathname, "index.html");
+    if (fs.existsSync(candidate)) {
+      return serveFile(res, candidate);
+    }
+
+    // 4. Try Next.js pages-manifest lookup for SSR routes
+    try {
+      const manifestPath = path.join(root, ".next", "server", "pages-manifest.json");
+      if (fs.existsSync(manifestPath)) {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+        const pageKey = pathname === "/" ? "/index.html" : pathname + ".html";
+        if (manifest[pageKey] || manifest[pathname]) {
+          const htmlFile = path.join(root, manifest[pageKey] || manifest[pathname]);
+          if (fs.existsSync(htmlFile)) {
+            return serveFile(res, htmlFile);
+          }
+        }
+      }
+    } catch {
+      // Ignore manifest errors
+    }
+
+    // 5. Fallback → serve index.html (SPA fallback)
+    const indexFile = path.join(root, "index.html");
+    if (fs.existsSync(indexFile)) {
+      return serveFile(res, indexFile);
+    }
+
+    res.writeHead(404);
+    res.end("Not Found");
+  });
+
+  return new Promise((resolve, reject) => {
+    server.listen(PORT, "127.0.0.1", () => {
+      console.log(`[GradeAssist] Local server running at http://127.0.0.1:${PORT}`);
+      resolve();
+    });
+    server.on("error", reject);
+  });
+}
+
+// ── Create the Electron window ────────────────────────────────────────────────
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    minWidth: 1024,
-    minHeight: 700,
-    title: 'GradeAssist',
-    icon: path.join(process.resourcesPath, 'app', 'electron', 'icon.ico'),
+    minWidth: 800,
+    minHeight: 600,
+    title: "GradeAssist",
+    icon: path.join(__dirname, "icon.ico"),
     webPreferences: {
-      preload: path.join(process.resourcesPath, 'app', 'electron', 'preload.js'),
+      nodeIntegration: false,
       contextIsolation: true,
-      nodeIntegration: false
-    }
+      sandbox: false,
+    },
+    autoHideMenuBar: true,
+    show: false, // Show after ready-to-show for a polished launch
   });
 
-  mainWindow.loadURL(APP_URL);
+  mainWindow.loadURL(`http://127.0.0.1:${PORT}`);
 
-  mainWindow.on('closed', () => {
+  mainWindow.once("ready-to-show", () => {
+    mainWindow.show();
+  });
+
+  mainWindow.on("closed", () => {
     mainWindow = null;
   });
 }
 
-function showStartupError(message) {
-  const { dialog } = require('electron');
-  dialog.showMessageBoxSync({
-    type: 'error',
-    title: 'Erreur de démarrage',
-    message: "GradeAssist n'a pas pu démarrer.",
-    detail: message,
-    buttons: ['OK']
-  });
-  app.quit();
-}
-
-app.on('ready', async () => {
+// ── App lifecycle ─────────────────────────────────────────────────────────────
+app.whenReady().then(async () => {
   try {
     await startServer();
     createWindow();
   } catch (err) {
-    showStartupError(err.message);
-  }
-});
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+    console.error("[GradeAssist] Failed to start server:", err);
     app.quit();
   }
 });
 
-app.on('before-quit', () => {
-  if (serverProcess) {
-    // Try graceful shutdown
-    serverProcess.kill('SIGTERM');
-    setTimeout(() => {
-      if (serverProcess && !serverProcess.killed) {
-        serverProcess.kill('SIGKILL');
-      }
-    }, 3000);
+app.on("window-all-closed", () => {
+  if (server) {
+    server.close();
+  }
+  app.quit();
+});
+
+app.on("activate", () => {
+  if (mainWindow === null) {
+    createWindow();
   }
 });
