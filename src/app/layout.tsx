@@ -27,6 +27,12 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        {/* SVG filter for neon glow button effect */}
+        <svg style={{ position: 'absolute', width: 0, height: 0 }} aria-hidden="true">
+          <filter id="neonUnopaq" width="3000%" x="-1000%" height="3000%" y="-1000%">
+            <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 3 0" />
+          </filter>
+        </svg>
         {children}
         <Toaster />
       </body>

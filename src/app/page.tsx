@@ -10,6 +10,7 @@ import type { EvaluationData, EvaluationModule as EvaluationModuleType, ModuleTy
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { EvaluationModule } from '@/components/evaluation-module';
+import { HelpGuideDialog } from '@/components/help-guide-dialog';
 import {
   Menubar,
   MenubarContent,
@@ -77,6 +78,9 @@ const getNewEvaluationModule = (type: ModuleType, name: string): EvaluationModul
       evaluationSheetTitleComplement: "...............................................................",
       criteria: DEFAULT_CRITERIA,
       attendance: {},
+      thesisStudents: [],
+      adminEmail: "",
+      syllabus: { chapters: [], pdfFileName: null, pdfDataUrl: null },
       continuousAssessmentGrade: type === 'standard' ? 10 : undefined,
       examGrade: type === 'standard' ? 10 : undefined,
       continuousAssessmentWeight: type === 'standard' ? 40 : undefined,
@@ -297,133 +301,127 @@ export default function GradeAssistPage() {
 
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8 selection:bg-primary/30">
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <div className="inline-block bg-card p-4 sm:p-6 rounded-2xl shadow-lg border">
-            <div className="flex items-center justify-center gap-4">
-                <div className="relative w-[60px] h-[60px] flex items-center justify-center bg-primary/10 rounded-xl overflow-hidden border-2 border-primary/20">
-                    <svg
-                        width="45"
-                        height="45"
-                        viewBox="0 0 80 75"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="text-primary"
-                    >
-                        <path
-                        d="M39.9992 4.16669L4.16589 24.1667L15.2284 30.0768V50.8334L39.9992 64.5834L75.8325 41.6667V20.8334L69.1659 16.9768M39.9992 4.16669L75.8325 24.1667L39.9992 44.1667L4.16589 24.1667M62.4992 55.8334L39.9992 69.5834V49.1667L62.4992 35.4167V55.8334Z"
-                        stroke="currentColor"
-                        strokeWidth="6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        />
-                    </svg>
+    <div className="min-h-screen">
+        {/* ═══ Premium Gradient Header ═══ */}
+        <header className="relative overflow-hidden bg-gradient-to-r from-[hsl(var(--header-gradient-from))] to-[hsl(var(--header-gradient-to))] text-primary-foreground">
+          {/* Decorative circles */}
+          <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-accent/10 blur-3xl" />
+          <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-white/5 blur-2xl" />
+          
+          <div className="relative container mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-5 gap-4">
+              <div className="flex items-center gap-4">
+                <div className="relative w-[52px] h-[52px] flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 transition-transform hover:scale-105">
+                  <svg width="36" height="36" viewBox="0 0 80 75" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-accent">
+                    <path d="M39.9992 4.16669L4.16589 24.1667L15.2284 30.0768V50.8334L39.9992 64.5834L75.8325 41.6667V20.8334L69.1659 16.9768M39.9992 4.16669L75.8325 24.1667L39.9992 44.1667L4.16589 24.1667M62.4992 55.8334L39.9992 69.5834V49.1667L62.4992 35.4167V55.8334Z" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                 </div>
                 <div>
-                <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
-                    <span className='text-foreground'>Grade</span>
-                    <span className='text-accent'>Assist</span>
-                </h1>
-                <p className="text-xs text-muted-foreground mt-1 font-bold">Designed by M.SADI</p>
-                <p className="text-base sm:text-lg text-muted-foreground mt-1">
-                    Application d&apos;Évaluation Modulaire
-                </p>
+                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                    Grade<span className="text-accent">Assist</span>
+                  </h1>
+                  <p className="text-xs text-white/60 font-medium mt-0.5">Application d&apos;Évaluation Modulaire · Designed by M.SADI</p>
                 </div>
-            </div>
-            </div>
-            <div className="w-full sm:w-auto">
-                <Menubar>
-                    <MenubarMenu>
-                        <MenubarTrigger>Fichier</MenubarTrigger>
-                        <MenubarContent>
-                            <NewModuleDialog onCreate={handleCreateModule} />
-                             {modules.length > 1 && (
-                                <>
-                                <MenubarSeparator />
-                                <MenubarItem onClick={() => handleDeleteModule(activeModule.id)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                    Supprimer le module actif
-                                </MenubarItem>
-                                </>
-                            )}
-                        </MenubarContent>
-                    </MenubarMenu>
+              </div>
+              <div className="flex items-center gap-2">
+                <HelpGuideDialog />
+                <Menubar className="bg-white/10 border-white/15 text-white hover:bg-white/15">
+                  <MenubarMenu>
+                    <MenubarTrigger className="text-white/90 hover:text-white data-[state=open]:bg-white/15">
+                      <FolderPlus className="mr-1.5 h-4 w-4" />
+                      Fichier
+                    </MenubarTrigger>
+                    <MenubarContent>
+                      <NewModuleDialog onCreate={handleCreateModule} />
+                      {modules.length > 1 && (
+                        <>
+                          <MenubarSeparator />
+                          <MenubarItem onClick={() => handleDeleteModule(activeModule.id)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Supprimer le module actif
+                          </MenubarItem>
+                        </>
+                      )}
+                    </MenubarContent>
+                  </MenubarMenu>
                 </Menubar>
+              </div>
             </div>
+          </div>
         </header>
 
-        <div className="space-y-4">
-             <Card>
-                <CardHeader className='pb-4'>
-                    <CardTitle className="text-xl flex items-center gap-2">
-                        <BookCopy />
-                        Module Actif
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-                    <Select value={activeModuleId || ''} onValueChange={(id) => setActiveModuleId(id)}>
-                        <SelectTrigger className="w-full md:w-1/2 lg:w-1/3">
-                            <SelectValue placeholder="Sélectionner une matière..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {modules.map(module => (
-                                <SelectItem key={module.id} value={module.id}>
-                                    {module.name} ({module.type === 'atelier' ? 'Atelier' : 'Matière'})
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    
-                    <div className="flex gap-2 w-full md:w-auto">
-                        <NewModuleDialog 
-                            onCreate={handleCreateModule} 
-                            trigger={
-                                <Button variant="outline" className="flex-1 md:flex-none">
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Nouveau
-                                </Button>
-                            }
-                        />
-                        
-                        {modules.length > 1 && (
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="destructive" className="flex-1 md:flex-none">
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Supprimer
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Êtes-vous absolument sûr ?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            Cette action supprimera définitivement le module &ldquo;{activeModule.name}&rdquo; et toutes ses données d&apos;évaluation associées.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteModule(activeModule.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                            Supprimer
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+        {/* ═══ Module Tabs Bar ═══ */}
+        <div className="bg-card border-b sticky top-0 z-30">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-2 py-2 overflow-x-auto">
+              {modules.map(module => (
+                <button
+                  key={module.id}
+                  onClick={() => setActiveModuleId(module.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                    module.id === activeModuleId
+                      ? 'bg-primary text-primary-foreground shadow-md'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                >
+                  <BookCopy className="h-4 w-4" />
+                  {module.name}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                    module.type === 'atelier' ? 'badge-atelier' : 'badge-matiere'
+                  }`}>
+                    {module.type === 'atelier' ? 'ATELIER' : 'MATIÈRE'}
+                  </span>
+                </button>
+              ))}
+              <NewModuleDialog
+                onCreate={handleCreateModule}
+                trigger={
+                  <button className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors border border-dashed border-border">
+                    <Plus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Ajouter</span>
+                  </button>
+                }
+              />
+              {modules.length > 1 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm text-destructive/70 hover:bg-destructive/10 hover:text-destructive transition-colors ml-auto">
+                      <Trash2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Supprimer</span>
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Supprimer le module ?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Cette action supprimera définitivement « {activeModule.name} » et toutes ses données.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDeleteModule(activeModule.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        Supprimer
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
+          </div>
         </div>
 
-
-        <EvaluationModule
-            key={activeModule.id}
-            module={activeModule}
-            onUpdate={(update) => handleUpdateModule(activeModule.id, update)}
-        />
-      
-        <footer className="text-center text-sm text-muted-foreground py-8">
-            <p>&copy; {new Date().getFullYear()} GradeAssist. Tous droits réservés.</p>
-            <p>Données sauvegardées localement. {modules.length} module(s) au total.</p>
-        </footer>
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+            <EvaluationModule
+                key={activeModule.id}
+                module={activeModule}
+                onUpdate={(update) => handleUpdateModule(activeModule.id, update)}
+            />
+          
+            <footer className="text-center text-sm text-muted-foreground py-8 border-t">
+                <p>&copy; {new Date().getFullYear()} GradeAssist. Tous droits réservés.</p>
+                <p className="mt-1">Données sauvegardées localement. {modules.length} module(s) au total.</p>
+            </footer>
+        </div>
     </div>
   );
 }

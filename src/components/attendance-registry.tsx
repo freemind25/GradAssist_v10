@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { CheckCircle2, XCircle, Clock, FileText, UserCheck, Download, Calendar as CalendarIcon, FileBarChart } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, FileText, UserCheck, Download, Calendar as CalendarIcon, FileBarChart, Mail, Send } from "lucide-react";
 import type { AttendanceData, AttendanceStatus } from "@/types";
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -43,6 +43,8 @@ interface AttendanceRegistryProps {
     teacherNames: string[];
     universityLogo: string | null;
     moduleName: string;
+    adminEmail?: string;
+    setAdminEmail?: (email: string) => void;
 }
 
 const statusOptions: { value: AttendanceStatus; label: string; icon: React.ElementType, colorClass: string, symbol: string }[] = [
@@ -71,7 +73,9 @@ export function AttendanceRegistry({
     studySubLevel,
     teacherNames,
     universityLogo,
-    moduleName
+    moduleName,
+    adminEmail = "",
+    setAdminEmail,
 }: AttendanceRegistryProps) {
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
     const [showRegistry, setShowRegistry] = useState(false);
@@ -154,20 +158,26 @@ export function AttendanceRegistry({
         }
         
         let csvContent = "data:text/csv;charset=utf-8,";
-        csvContent += `Rapport d'Absences - ${monthName}\n`;
+        const monthShort = format(new Date(year, month, 1), 'MMMM', { locale: fr });
+        csvContent += `Rapport d'Absences - ${monthShort} ${year}\n`;
         csvContent += `Institut:,"${establishmentName || 'N/A'}"\n`;
         csvContent += `Département:,"${departmentName || 'N/A'}"\n`;
         csvContent += `Niveau:,"${studyLevel ? `${studyLevel} - ${studySubLevel}`: 'N/A'}"\n`;
-        csvContent += `Enseignant(s):,"${teacherNames.join(', ') || 'N/A'}"\n`;
+        csvContent += `Enseignant(s):,"${teacherNames.filter(n => n.trim()).join(', ') || 'N/A'}"\n`;
         csvContent += `Matière:,"${moduleName || 'N/A'}"\n\n`;
 
-        const dayHeaders = recordedDays.map(day => format(day, 'd'));
-        const headers = ["Nom et Prénom", ...dayHeaders, "Total Absences"];
+        const dayHeaders = recordedDays.map(day => {
+            const d = format(day, 'd');
+            const m = format(day, 'MMM', { locale: fr });
+            return `${d}-${m}`;
+        });
+        const headers = ["N°", "Nom et Prénom", ...dayHeaders, "Total Absences"];
         csvContent += headers.join(',') + '\n';
 
-        studentReports.forEach(({ name, dailyStatuses, absenceCount }) => {
+        studentReports.forEach(({ name, dailyStatuses, absenceCount }, idx) => {
             const rowData = recordedDays.map(day => `"${dailyStatuses[day.getDate()] || 'P'}"`);
             const row = [
+                String(idx + 1),
                 `"${name}"`,
                 ...rowData,
                 absenceCount
@@ -186,13 +196,14 @@ export function AttendanceRegistry({
     };
 
     const handleExportPDF = (concise: boolean) => {
-         if (!selectedDate) {
-             toast({ variant: "destructive", title: "Aucune Date", description: "Veuillez sélectionner une date." });
+        if (!selectedDate) {
+            toast({ variant: "destructive", title: "Aucune Date", description: "Veuillez sélectionner une date." });
             return;
         }
         const { studentReports, recordedDays, month, year } = getMonthlyReportData(getMonth(selectedDate), getYear(selectedDate), concise);
         const monthName = format(new Date(year, month, 1), 'MMMM yyyy', { locale: fr });
-        
+        const monthShort = format(new Date(year, month, 1), 'MMMM', { locale: fr });
+
         if (studentReports.length === 0 || !students.some(s => s.trim())) {
             toast({ variant: "destructive", title: "Aucune Donnée", description: "Le registre de présence est vide pour ce mois ou aucun étudiant n'est inscrit." });
             return;
@@ -203,92 +214,237 @@ export function AttendanceRegistry({
         }
 
         const doc = new jsPDF({ orientation: 'landscape' });
+        const pageWidth = doc.internal.pageSize.getWidth();
         const pageMargin = 14;
-        let yPos = 15;
+        let yPos = 12;
+        const lineHeight = 6;
+        const midX = pageWidth / 2;
 
+        // ═══ 1. Header: two-column institution info ═══
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+
+        const leftLabels = ['Institut:', 'Département:', 'Niveau:', 'Enseignant(s):', 'Matière:'];
+        const leftValues = [
+            establishmentName || 'N/A',
+            departmentName || 'N/A',
+            studyLevel ? `${studyLevel} - ${studySubLevel}` : 'N/A',
+            teacherNames.filter(n => n.trim()).join(', ') || 'N/A',
+            moduleName || 'N/A',
+        ];
+
+        leftLabels.forEach((label, i) => {
+            // Label (bold)
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.text(label, pageMargin, yPos + i * lineHeight);
+            // Value (normal)
+            doc.setFont('helvetica', 'normal');
+            doc.text(leftValues[i], pageMargin + 32, yPos + i * lineHeight);
+        });
+
+        // Right side: University logo (if available)
         if (universityLogo) {
             try {
                 const img = new window.Image();
                 img.src = universityLogo;
                 const imageTypeMatch = universityLogo.match(/^data:image\/(png|jpe?g|svg\+xml);base64,/);
-                let imageType = 'PNG'; 
+                let imageType = 'PNG';
                 if (imageTypeMatch && imageTypeMatch[1]) {
                     if (imageTypeMatch[1] === 'jpeg' || imageTypeMatch[1] === 'jpg') imageType = 'JPEG';
-                    else if (imageTypeMatch[1] === 'svg+xml') imageType = 'SVG'; 
+                    else if (imageTypeMatch[1] === 'svg+xml') imageType = 'SVG';
                     else imageType = imageTypeMatch[1].toUpperCase();
                 }
-
-                const logoWidth = 25;
+                const logoWidth = 22;
                 const logoHeight = (img.height * logoWidth) / img.width;
-                doc.addImage(universityLogo, imageType, doc.internal.pageSize.getWidth() - pageMargin - logoWidth, yPos, logoWidth, logoHeight);
-             } catch (e) {
+                doc.addImage(universityLogo, imageType, pageWidth - pageMargin - logoWidth, yPos, logoWidth, logoHeight);
+            } catch (e) {
                 console.error("Error adding logo to PDF:", e);
-             }
+            }
         }
 
-        doc.setFillColor(230, 230, 230);
-        doc.rect(pageMargin, yPos - 5, doc.internal.pageSize.getWidth() - (pageMargin * 2), 12, 'F');
-        doc.setTextColor(0, 0, 0);
+        yPos += leftLabels.length * lineHeight + 4;
+
+        // ═══ 2. Title bar ═══
+        doc.setFillColor(220, 220, 220);
+        doc.rect(pageMargin, yPos - 4, pageWidth - pageMargin * 2, 10, 'F');
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(14);
-        doc.text(`Rapport d'Absences - ${monthName}`, doc.internal.pageSize.getWidth() / 2, yPos + 2, { align: 'center' });
-        yPos += 15;
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Rapport d'Absences - ${monthShort} ${year}`, midX, yPos + 2, { align: 'center' });
+        yPos += 12;
 
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        const infoCol1 = `Institut: ${establishmentName || 'N/A'}\nDépartement: ${departmentName || 'N/A'}\nNiveau: ${studyLevel ? `${studyLevel} - ${studySubLevel}`: 'N/A'}`;
-        const infoCol2 = `Enseignant(s): ${teacherNames.join(', ') || 'N/A'}\nMatière: ${moduleName || 'N/A'}`;
-        doc.text(infoCol1, pageMargin, yPos);
-        doc.text(infoCol2, doc.internal.pageSize.getWidth() / 2, yPos);
-        yPos += 20;
-        
-        const dayHeaders = recordedDays.map(day => format(day, 'd'));
-        const lastColIdx = dayHeaders.length + 1;
+        // ═══ 3. Table ═══
+        // Date headers: "03-mars" format
+        const dayHeaders = recordedDays.map(day => {
+            const d = format(day, 'd');
+            const m = format(day, 'MMM', { locale: fr });
+            return `${d}-${m}`;
+        });
 
-        // En-tête simple (une seule ligne) — évite les problèmes de typage rowSpan/colSpan
-        const simpleHead = [['Nom et Prénom', ...dayHeaders, 'Absences']];
+        const headerRow = [['N°', 'Nom et Prénom', ...dayHeaders, 'Total Absences']];
+        const lastColIdx = dayHeaders.length + 2; // N° + Name + dates + Total
 
-        const body = studentReports.map(({ name, dailyStatuses, absenceCount }) => {
+        const bodyRows = studentReports.map(({ name, dailyStatuses, absenceCount }, idx) => {
             const rowData = recordedDays.map(day => dailyStatuses[day.getDate()] || 'P');
-            return [name, ...rowData, String(absenceCount)];
+            return [String(idx + 1), name, ...rowData, String(absenceCount)];
         });
 
         autoTable(doc, {
-            head: simpleHead,
-            body: body,
+            head: headerRow,
+            body: bodyRows,
             startY: yPos,
             theme: 'grid',
-            styles: { fontSize: 7, cellPadding: 1, halign: 'center' as const, valign: 'middle' as const },
-            headStyles: { fillColor: [30, 80, 160] as [number, number, number], textColor: 255, fontStyle: 'bold' as const },
+            styles: {
+                fontSize: 7,
+                cellPadding: 1.5,
+                halign: 'center' as const,
+                valign: 'middle' as const,
+                lineWidth: 0.2,
+                lineColor: [180, 180, 180] as [number, number, number],
+            },
+            headStyles: {
+                fillColor: [50, 50, 50] as [number, number, number],
+                textColor: 255,
+                fontStyle: 'bold' as const,
+                halign: 'center' as const,
+                fontSize: 7,
+            },
             columnStyles: {
-                0: { halign: 'left' as const, fontStyle: 'bold' as const, minCellWidth: 40 },
-                [lastColIdx]: { fontStyle: 'bold' as const, halign: 'center' as const },
+                0: { halign: 'center' as const, fontStyle: 'bold' as const, cellWidth: 10 },
+                1: { halign: 'left' as const, fontStyle: 'bold' as const, minCellWidth: 45 },
+                [lastColIdx]: { fontStyle: 'bold' as const, halign: 'center' as const, cellWidth: 22 },
             },
             didParseCell: (data) => {
-                if (data.section === 'body' && data.column.index > 0 && data.column.index <= dayHeaders.length) {
+                // Color-code attendance cells in body
+                if (data.section === 'body' && data.column.index > 1 && data.column.index < lastColIdx) {
                     const cellText = String(data.cell.raw);
                     if (cellText === 'A') {
-                        data.cell.styles.fillColor = '#ffcdd2';
-                        data.cell.styles.textColor = '#b71c1c';
+                        data.cell.styles.fillColor = [255, 205, 210] as [number, number, number];
+                        data.cell.styles.textColor = [183, 28, 28] as [number, number, number];
+                        data.cell.styles.fontStyle = 'bold' as const;
                     } else if (cellText === 'R') {
-                        data.cell.styles.fillColor = '#ffecb3';
-                        data.cell.styles.textColor = '#e65100';
+                        data.cell.styles.fillColor = [255, 236, 179] as [number, number, number];
+                        data.cell.styles.textColor = [230, 81, 0] as [number, number, number];
+                        data.cell.styles.fontStyle = 'bold' as const;
                     } else if (cellText === 'E') {
-                        data.cell.styles.fillColor = '#bbdefb';
-                        data.cell.styles.textColor = '#0d47a1';
+                        data.cell.styles.fillColor = [187, 222, 251] as [number, number, number];
+                        data.cell.styles.textColor = [13, 71, 161] as [number, number, number];
+                        data.cell.styles.fontStyle = 'bold' as const;
+                    } else {
+                        // P = present — light green tint
+                        data.cell.styles.fillColor = [232, 245, 233] as [number, number, number];
+                        data.cell.styles.textColor = [27, 94, 32] as [number, number, number];
                     }
                 }
-            }
+                // Alternating row background (subtle)
+                if (data.section === 'body' && data.row.index % 2 === 1) {
+                    const currentFill = data.cell.styles.fillColor;
+                    // Only apply if no special color was set above
+                    if (!currentFill || (Array.isArray(currentFill) && currentFill[0] === 255 && currentFill[1] === 255)) {
+                        data.cell.styles.fillColor = [245, 245, 245] as [number, number, number];
+                    }
+                }
+            },
         });
-        
-        const finalY = (doc as any).lastAutoTable.finalY || yPos;
-        const legendY = finalY + 10;
-        doc.setFontSize(8);
-        doc.text("Légende: P=Présent, A=Absent, R=Retard, E=Excusé", pageMargin, legendY);
 
+        // ═══ 4. Legend ═══
+        const finalY = (doc as any).lastAutoTable.finalY || yPos + 50;
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(80, 80, 80);
+        doc.text("Légende: P = Présent, A = Absent, R = Retard, E = Excusé", pageMargin, finalY + 8);
 
         doc.save(`rapport_absences_${year}_${String(month + 1).padStart(2, '0')}${concise ? '_concis' : ''}.pdf`);
         toast({ title: "Succès", description: `Rapport PDF pour ${monthName} exporté.` });
+    };
+
+    // ── Email helpers ──────────────────────────────────────────────────
+
+    const generateReportText = (concise: boolean): string => {
+        if (!selectedDate) return "";
+        const { studentReports, recordedDays, month, year } = getMonthlyReportData(getMonth(selectedDate), getYear(selectedDate), concise);
+        const monthName = format(new Date(year, month, 1), 'MMMM yyyy', { locale: fr });
+        const monthShort = format(new Date(year, month, 1), 'MMMM', { locale: fr });
+
+        // Date headers in "dd-mmm" format
+        const dayHeaders = recordedDays.map(day => {
+            const d = format(day, 'd');
+            const m = format(day, 'MMM', { locale: fr });
+            return `${d}-${m}`;
+        });
+
+        let text = `RAPPORT D'ABSENCES - ${monthShort.toUpperCase()} ${year}\n`;
+        text += `${'═'.repeat(60)}\n\n`;
+        text += `Institut :       ${establishmentName || 'N/A'}\n`;
+        text += `Département :    ${departmentName || 'N/A'}\n`;
+        text += `Niveau :         ${studyLevel ? `${studyLevel} - ${studySubLevel}` : 'N/A'}\n`;
+        text += `Enseignant(s) :  ${teacherNames.filter(n => n.trim()).join(', ') || 'N/A'}\n`;
+        text += `Matière :        ${moduleName || 'N/A'}\n\n`;
+
+        // Table header
+        const colWidth = 12;
+        const nameWidth = 25;
+        const numWidth = 4;
+        let header = `${'N°'.padEnd(numWidth)} ${'Nom et Prénom'.padEnd(nameWidth)}`;
+        dayHeaders.forEach(h => { header += ` ${h.padEnd(colWidth)}`; });
+        header += ` ${'Total'.padEnd(6)}`;
+
+        text += header + '\n';
+        text += '-'.repeat(header.length) + '\n';
+
+        // Table rows
+        studentReports.forEach(({ name, dailyStatuses, absenceCount }, idx) => {
+            let row = `${String(idx + 1).padEnd(numWidth)} ${name.padEnd(nameWidth)}`;
+            recordedDays.forEach(day => {
+                const symbol = dailyStatuses[day.getDate()] || 'P';
+                row += ` ${symbol.padEnd(colWidth)}`;
+            });
+            row += ` ${String(absenceCount).padEnd(6)}`;
+            text += row + '\n';
+        });
+
+        text += '\n' + '═'.repeat(60) + '\n';
+        text += `Légende: P = Présent, A = Absent, R = Retard, E = Excusé\n`;
+        text += `Rapport généré le ${format(new Date(), 'dd/MM/yyyy à HH:mm')}\n`;
+        text += `GradeAssist - Application d'évaluation académique`;
+
+        return text;
+    };
+
+    const sendReportByEmail = (concise: boolean) => {
+        if (!selectedDate) {
+            toast({ variant: "destructive", title: "Aucune Date", description: "Veuillez sélectionner une date." });
+            return;
+        }
+        if (!adminEmail) {
+            toast({ variant: "destructive", title: "Email manquant", description: "Veuillez renseigner l'adresse email de l'administration dans les Informations Générales." });
+            return;
+        }
+
+        const { studentReports, recordedDays, month, year } = getMonthlyReportData(getMonth(selectedDate), getYear(selectedDate), concise);
+        const monthName = format(new Date(year, month, 1), 'MMMM yyyy', { locale: fr });
+
+        if (studentReports.length === 0 || !students.some(s => s.trim())) {
+            toast({ variant: "destructive", title: "Aucune Donnée", description: "Le registre de présence est vide pour ce mois." });
+            return;
+        }
+        if (concise && recordedDays.length === 0) {
+            toast({ variant: "destructive", title: "Aucune Donnée", description: "Aucune absence enregistrée pour ce mois." });
+            return;
+        }
+
+        const reportText = generateReportText(concise);
+        const subject = `Rapport d'absences - ${moduleName || 'Matière'} - ${monthName}`;
+
+        const mailtoUrl = `mailto:${encodeURIComponent(adminEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(reportText)}`;
+        window.open(mailtoUrl, "_blank");
+
+        toast({
+            title: "Email préparé",
+            description: `Le client email s'ouvre avec le rapport. Joignez le fichier PDF exporté si besoin.`,
+        });
     };
 
     return (
@@ -297,18 +453,19 @@ export function AttendanceRegistry({
                 <Button 
                     variant="outline" 
                     onClick={() => setShowRegistry(!showRegistry)}
-                    disabled={false}
+                    className="border-dashed border-accent/40 text-accent hover:bg-accent/5 hover:border-accent/60"
                 >
                     <UserCheck className="mr-2 h-4 w-4" />
-                    {showRegistry ? "Cacher" : "Afficher"} le Registre de Présence
+                    {showRegistry ? "Masquer" : "Registre de Présence"}
                 </Button>
             </div>
             {showRegistry && (
-                <Card className="shadow-lg">
-                    <CardHeader>
-                        <CardTitle className="text-xl flex items-center gap-2"><UserCheck />Registre de Présence</CardTitle>
+                <Card className="card-premium overflow-hidden">
+                    <div className="h-1 bg-gradient-to-r from-emerald-500 via-accent to-emerald-500" />
+                    <CardHeader className="bg-gradient-to-r from-emerald-500/5 to-transparent">
+                        <CardTitle className="text-lg flex items-center gap-2"><UserCheck className="h-5 w-5 text-emerald-600" />Registre de Présence</CardTitle>
                         <CardDescription>
-                            Sélectionnez une date pour enregistrer les présences. Les rapports sont générés pour le mois entier de la date sélectionnée.
+                            Sélectionnez une date pour enregistrer les présences. Les rapports couvrent le mois complet.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="grid md:grid-cols-3 gap-6">
@@ -385,24 +542,72 @@ export function AttendanceRegistry({
                             </Table>
                         </div>
                     </CardContent>
-                    <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t">
-                         <div className="text-sm text-muted-foreground">
-                            Légende: P=Présent, A=Absent, R=Retard, E=Excusé
-                        </div>
-                        <div className="flex flex-wrap justify-end gap-2">
-                            <Button onClick={handleExportCSV} variant="outline">
-                                <Download className="mr-2 h-4 w-4" />
-                                Rapport Complet (CSV)
-                            </Button>
-                            <Button onClick={() => handleExportPDF(false)} variant="outline">
-                                <Download className="mr-2 h-4 w-4" />
-                                Rapport Complet (PDF)
-                            </Button>
-                             <Button onClick={() => handleExportPDF(true)}>
-                                <FileBarChart className="mr-2 h-4 w-4" />
-                                Rapport Concis (PDF)
-                            </Button>
-                        </div>
+                    <CardFooter className="flex flex-col gap-4 pt-6 border-t">
+                         {/* ── Admin email + Send section ── */}
+                         <div className="w-full space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-medium">
+                                <Mail className="h-4 w-4 text-primary" />
+                                Envoi du rapport mensuel à l&apos;administration
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                <div className="flex-1 relative">
+                                    <input
+                                        type="email"
+                                        value={adminEmail}
+                                        onChange={(e) => setAdminEmail?.(e.target.value)}
+                                        placeholder="Email administration (ex: dep-info@univ.dz)"
+                                        className="w-full h-9 pl-9 pr-3 rounded-lg border border-border/60 bg-background text-sm focus:border-primary/40 focus:ring-1 focus:ring-primary/20 outline-none transition-all"
+                                    />
+                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        onClick={() => sendReportByEmail(true)}
+                                        disabled={!adminEmail}
+                                        className="bg-primary hover:bg-primary/90"
+                                        size="sm"
+                                    >
+                                        <Send className="mr-2 h-3.5 w-3.5" />
+                                        Envoyer Rapport Concis
+                                    </Button>
+                                    <Button
+                                        onClick={() => sendReportByEmail(false)}
+                                        disabled={!adminEmail}
+                                        variant="outline"
+                                        size="sm"
+                                    >
+                                        <Send className="mr-2 h-3.5 w-3.5" />
+                                        Envoyer Rapport Complet
+                                    </Button>
+                                </div>
+                            </div>
+                            {!adminEmail && (
+                                <p className="text-[11px] text-muted-foreground">
+                                    Renseignez l&apos;email de l&apos;administration pour envoyer les rapports mensuels directement depuis l&apos;application.
+                                </p>
+                            )}
+                         </div>
+
+                         {/* ── Export buttons ── */}
+                         <div className="w-full flex flex-col sm:flex-row justify-between items-center gap-3 pt-3 border-t border-border/40">
+                            <div className="text-sm text-muted-foreground">
+                                Légende: P=Présent, A=Absent, R=Retard, E=Excusé
+                            </div>
+                            <div className="flex flex-wrap justify-end gap-2">
+                                <Button onClick={handleExportCSV} variant="outline" size="sm">
+                                    <Download className="mr-2 h-3.5 w-3.5" />
+                                    CSV
+                                </Button>
+                                <Button onClick={() => handleExportPDF(false)} variant="outline" size="sm">
+                                    <Download className="mr-2 h-3.5 w-3.5" />
+                                    PDF Complet
+                                </Button>
+                                <Button onClick={() => handleExportPDF(true)} size="sm">
+                                    <FileBarChart className="mr-2 h-3.5 w-3.5" />
+                                    PDF Concis
+                                </Button>
+                            </div>
+                         </div>
                     </CardFooter>
                 </Card>
             )}
