@@ -16,8 +16,24 @@ if (!DATABASE_URL) {
   );
 }
 
-// Client SQL Neon (serverless, fonctionne sans TCP)
-export const sql = neon(DATABASE_URL || '');
+// Lazy initialization — évite le crash au build time quand DATABASE_URL n'est pas défini
+let _sql: ReturnType<typeof neon> | null = null;
+
+function ensureSql() {
+  if (!_sql) {
+    if (!DATABASE_URL) {
+      throw new Error('DATABASE_URL non configuré. La synchronisation cloud est désactivée.');
+    }
+    _sql = neon(DATABASE_URL);
+  }
+  return _sql;
+}
+
+// Export sql as a tagged template function that lazily delegates to the Neon client
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function sql(strings: TemplateStringsArray, ...values: any[]): any {
+  return ensureSql()(strings, ...values);
+}
 
 // Vérifier la connexion
 export async function testConnection() {
