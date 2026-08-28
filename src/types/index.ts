@@ -101,6 +101,9 @@ export interface EvaluationData {
 
   // Configuration alertes
   atRiskConfig: AtRiskConfig;
+
+  // Tutorat
+  tutoringSessions: TutoringSession[];
 }
 
 export type ChapterStatus = 'not_started' | 'in_progress' | 'completed';
@@ -154,4 +157,33 @@ export interface WorkGroup {
 export interface AtRiskConfig {
   attendanceThreshold: number; // percentage, default 75
   gradeThreshold: number; // out of 20, default 10
+}
+
+// ─── Tutorat (Tutoring) ───
+export type TutoringSessionType = 'cours' | 'td' | 'tp' | 'rattrapage' | 'prep_examen' | 'methode' | 'autre';
+
+export interface TutoringSession {
+  id: string;
+  studentName: string;
+  date: string;        // YYYY-MM-DD
+  time: string;        // HH:MM
+  duration: number;    // minutes
+  sessionType: TutoringSessionType;
+  topic: string;       // Chapitre/sujet abordé
+  objectives: string;  // Objectifs de la séance
+  materials: string;   // Support utilisé (diapo, exercices, etc.)
+  notes: string;       // Notes libres
+  progress: number;    // 0-100, progression de l'étudiant
+  rating: number;      // 1-5, qualité de la séance
+  completed: boolean;
+}
+
+export interface TutoringStats {
+  totalSessions: number;
+  totalHours: number;
+  byType: Record<TutoringSessionType, number>;
+  byStudent: Record<string, number>;
+  avgRating: number;
+  avgDuration: number;
+  completionRate: number;
 }

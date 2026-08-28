@@ -22,10 +22,11 @@ import { AnalyticsDashboard } from './analytics-dashboard';
 import { AtRiskStudents } from './at-risk-students';
 import { QuickNotes } from './quick-notes';
 import { WorkGroups } from './work-groups';
+import { TutoringTracker } from './tutoring-tracker';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-type SidebarTab = 'info' | 'evaluation' | 'attendance' | 'encadrement' | 'canevas' | 'dashboard' | 'alerts';
+type SidebarTab = 'info' | 'evaluation' | 'attendance' | 'encadrement' | 'canevas' | 'dashboard' | 'alerts' | 'tutoring';
 
 interface EvaluationModuleProps {
     module: EvaluationModuleType;
@@ -42,6 +43,7 @@ export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
     const quickNotes = module.evaluationData.quickNotes ?? [];
     const workGroups = module.evaluationData.workGroups ?? [];
     const atRiskConfig = module.evaluationData.atRiskConfig ?? { attendanceThreshold: 75, gradeThreshold: 10 };
+    const tutoringSessions = module.evaluationData.tutoringSessions ?? [];
 
     const updateField = <K extends keyof EvaluationData>(field: K, value: EvaluationData[K]) => {
         onUpdate({ [field]: value });
@@ -145,6 +147,7 @@ export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
         { id: 'canevas', label: 'Canevas', icon: Route },
         { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
         { id: 'alerts', label: 'Alertes', icon: AlertTriangle },
+        { id: 'tutoring', label: 'Tutorat', icon: GraduationCap },
     ];
 
     return (
@@ -492,6 +495,15 @@ export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
                             onUpdate={(groups) => updateField('workGroups', groups)}
                         />
                     </div>
+                )}
+
+                {/* ── Tab: Tutorat ── */}
+                {activeTab === 'tutoring' && (
+                    <TutoringTracker
+                        studentNames={module.evaluationData.studentNames}
+                        sessions={tutoringSessions}
+                        onUpdate={(sessions) => updateField('tutoringSessions', sessions)}
+                    />
                 )}
             </div>
         </div>

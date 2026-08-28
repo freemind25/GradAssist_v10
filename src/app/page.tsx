@@ -90,6 +90,7 @@ const getNewEvaluationModule = (type: ModuleType, name: string): EvaluationModul
       syllabus: { chapters: [], pdfFileName: null, pdfDataUrl: null },
       quickNotes: [],
       workGroups: [],
+      tutoringSessions: [],
       atRiskConfig: { attendanceThreshold: 75, gradeThreshold: 10 },
       continuousAssessmentGrade: type === 'standard' ? 10 : undefined,
       examGrade: type === 'standard' ? 10 : undefined,
