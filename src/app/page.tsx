@@ -2,8 +2,8 @@
 "use client";
 
 import type * as React from 'react';
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { BookCopy, Plus, FolderPlus, Trash2 } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { BookCopy, Plus, FolderPlus, Trash2, Cloud, CloudOff, RefreshCw, Download, Upload, HardDrive } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DEFAULT_CRITERIA, TARGET_SUM_COEFFICIENTS } from "@/config/grading-config";
 import type { EvaluationData, EvaluationModule as EvaluationModuleType, ModuleType } from "@/types";
@@ -11,6 +11,11 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { EvaluationModule } from '@/components/evaluation-module';
 import { HelpGuideDialog } from '@/components/help-guide-dialog';
+import { GoogleDriveSync } from '@/components/google-drive-sync';
+import { saveToGoogleDrive, loadFromGoogleDrive } from '@/lib/google-drive-service';
+import { TeacherLogin, getTeacher, type TeacherProfile } from '@/components/teacher-login';
+import { PwaInstallBanner } from '@/components/pwa-install';
+
 import {
   Menubar,
   MenubarContent,
@@ -51,6 +56,8 @@ import {
 } from "@/components/ui/select";
 
 
+import { testConnection, saveToCloud, loadFromCloud, syncBidirectional } from '@/lib/sync-service';
+
 const LOCALSTORAGE_MODULES_KEY = 'gradeAssist_modules';
 const LOCALSTORAGE_ACTIVE_MODULE_ID_KEY = 'gradeAssist_activeModuleId';
 
@@ -81,6 +88,9 @@ const getNewEvaluationModule = (type: ModuleType, name: string): EvaluationModul
       thesisStudents: [],
       adminEmail: "",
       syllabus: { chapters: [], pdfFileName: null, pdfDataUrl: null },
+      quickNotes: [],
+      workGroups: [],
+      atRiskConfig: { attendanceThreshold: 75, gradeThreshold: 10 },
       continuousAssessmentGrade: type === 'standard' ? 10 : undefined,
       examGrade: type === 'standard' ? 10 : undefined,
       continuousAssessmentWeight: type === 'standard' ? 40 : undefined,
@@ -179,6 +189,11 @@ export default function GradeAssistPage() {
   const [modules, setModules] = useState<EvaluationModuleType[]>([]);
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isCloudConnected, setIsCloudConnected] = useState<boolean | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [teacher, setTeacherState] = useState<TeacherProfile | null>(null);
+  const [teacherChecked, setTeacherChecked] = useState(false);
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -230,6 +245,97 @@ export default function GradeAssistPage() {
     }, 1000);
     return () => clearTimeout(handler);
   }, [modules, activeModuleId, isLoaded]);
+
+  // Vérifier la connexion cloud au montage
+  useEffect(() => {
+    testConnection().then((status) => {
+      setIsCloudConnected(status.connected);
+    });
+  }, []);
+
+  // Vérifier si l'enseignant est connecté
+  useEffect(() => {
+    const t = getTeacher();
+    setTeacherState(t);
+    setTeacherChecked(true);
+  }, []);
+
+  // Auto-sync au démarrage si connecté au cloud
+  useEffect(() => {
+    if (!isLoaded || !isCloudConnected) return;
+    const timeout = setTimeout(() => {
+      syncBidirectional().then((result) => {
+        if (result.success && result.modulesSynced && result.modulesSynced > 0) {
+          const modulesJson = localStorage.getItem(LOCALSTORAGE_MODULES_KEY);
+          if (modulesJson) {
+            setModules(JSON.parse(modulesJson));
+          }
+        }
+      }).catch(() => {});
+    }, 2000);
+    return () => clearTimeout(timeout);
+  }, [isLoaded, isCloudConnected]);
+
+  // Handlers de synchronisation
+  const handleSyncToCloud = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const result = await saveToCloud();
+      toast({
+        title: result.success ? "Synchronisation réussie" : "Erreur",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [toast]);
+
+  const handleSyncFromCloud = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const result = await loadFromCloud();
+      if (result.success && result.modulesSynced && result.modulesSynced > 0) {
+        // Recharger les modules depuis localStorage
+        const modulesJson = localStorage.getItem(LOCALSTORAGE_MODULES_KEY);
+        if (modulesJson) {
+          const loadedModules = JSON.parse(modulesJson);
+          setModules(loadedModules);
+        }
+      }
+      toast({
+        title: result.success ? "Chargement réussi" : "Erreur",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [toast]);
+
+  const handleSyncBidirectional = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const result = await syncBidirectional();
+      if (result.success) {
+        // Recharger les modules depuis localStorage
+        const modulesJson = localStorage.getItem(LOCALSTORAGE_MODULES_KEY);
+        if (modulesJson) {
+          const loadedModules = JSON.parse(modulesJson);
+          setModules(loadedModules);
+        }
+      }
+      toast({
+        title: result.success ? "Synchronisation terminée" : "Erreur",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [toast]);
+
+
 
   const activeModule = useMemo(() => modules.find(m => m.id === activeModuleId), [modules, activeModuleId]);
 
@@ -291,6 +397,11 @@ export default function GradeAssistPage() {
   }, [modules.length, activeModuleId, toast]);
   
 
+  // Afficher l'écran de connexion enseignant si pas encore identifié
+  if (teacherChecked && !teacher) {
+    return <TeacherLogin onLogin={(profile) => setTeacherState(profile)} />;
+  }
+
   if (!isLoaded || !activeModule) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -325,6 +436,45 @@ export default function GradeAssistPage() {
               </div>
               <div className="flex items-center gap-2">
                 <HelpGuideDialog />
+
+                {/* Teacher profile badge */}
+                {teacher && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/10 border border-white/15" title={`${teacher.name} — ${teacher.email}`}>
+                    <div className="w-5 h-5 rounded-full bg-accent/30 flex items-center justify-center text-[10px] font-bold text-white">
+                      {teacher.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                    </div>
+                    <span className="text-xs text-white/70 hidden sm:inline max-w-[100px] truncate">
+                      {teacher.name.split(' ')[0]}
+                    </span>
+                  </div>
+                )}
+
+                {/* Google Drive Sync */}
+                <GoogleDriveSync
+                  onDataLoaded={(data) => {
+                    if (data.modules && Array.isArray(data.modules)) {
+                      setModules(data.modules);
+                      if (data.activeModuleId) setActiveModuleId(data.activeModuleId);
+                    }
+                  }}
+                  onGetData={() => ({ modules, activeModuleId })}
+                  compact
+                />
+
+                {/* Indicateur de connexion cloud */}
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/10 border border-white/15">
+                  {isCloudConnected === null ? (
+                    <RefreshCw className="h-3.5 w-3.5 text-white/50 animate-spin" />
+                  ) : isCloudConnected ? (
+                    <Cloud className="h-3.5 w-3.5 text-emerald-400" />
+                  ) : (
+                    <CloudOff className="h-3.5 w-3.5 text-white/50" />
+                  )}
+                  <span className="text-xs text-white/70 hidden sm:inline">
+                    {isCloudConnected === null ? '...' : isCloudConnected ? 'Cloud' : 'Local'}
+                  </span>
+                </div>
+
                 <Menubar className="bg-white/10 border-white/15 text-white hover:bg-white/15">
                   <MenubarMenu>
                     <MenubarTrigger className="text-white/90 hover:text-white data-[state=open]:bg-white/15">
@@ -333,6 +483,68 @@ export default function GradeAssistPage() {
                     </MenubarTrigger>
                     <MenubarContent>
                       <NewModuleDialog onCreate={handleCreateModule} />
+                      <MenubarSeparator />
+                      <MenubarItem onClick={handleSyncBidirectional} disabled={isSyncing || !isCloudConnected}>
+                        <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                        Synchroniser avec Cloud
+                      </MenubarItem>
+                      <MenubarItem onClick={handleSyncToCloud} disabled={isSyncing || !isCloudConnected}>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Envoyer vers Cloud
+                      </MenubarItem>
+                      <MenubarItem onClick={handleSyncFromCloud} disabled={isSyncing || !isCloudConnected}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Charger depuis Cloud
+                      </MenubarItem>
+                      <MenubarSeparator />
+                      <MenubarItem onClick={async () => {
+                        const result = await saveToGoogleDrive({ modules, activeModuleId });
+                        toast({ title: result.success ? "Sauvegardé" : "Erreur", description: result.message, variant: result.success ? "default" : "destructive" });
+                      }}>
+                        <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none">
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                        </svg>
+                        Sauvegarder sur Google Drive
+                      </MenubarItem>
+                      <MenubarItem onClick={async () => {
+                        const result = await loadFromGoogleDrive();
+                        if (result.success && result.data?.modules) {
+                          setModules(result.data.modules);
+                          if (result.data.activeModuleId) setActiveModuleId(result.data.activeModuleId);
+                        }
+                        toast({ title: result.success ? "Chargé" : "Erreur", description: result.message, variant: result.success ? "default" : "destructive" });
+                      }}>
+                        <HardDrive className="mr-2 h-4 w-4" />
+                        Charger depuis Google Drive
+                      </MenubarItem>
+                      <MenubarSeparator />
+                      <MenubarItem onClick={async () => {
+                        const result = await saveToGoogleDrive({ modules, activeModuleId });
+                        toast({ title: result.success ? "Sauvegardé" : "Erreur", description: result.message, variant: result.success ? "default" : "destructive" });
+                      }}>
+                        <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none">
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                        </svg>
+                        Sauvegarder sur Google Drive
+                      </MenubarItem>
+                      <MenubarItem onClick={async () => {
+                        const result = await loadFromGoogleDrive();
+                        if (result.success && result.data?.modules) {
+                          setModules(result.data.modules);
+                          if (result.data.activeModuleId) setActiveModuleId(result.data.activeModuleId);
+                        }
+                        toast({ title: result.success ? "Chargé" : "Erreur", description: result.message, variant: result.success ? "default" : "destructive" });
+                      }}>
+                        <HardDrive className="mr-2 h-4 w-4" />
+                        Charger depuis Google Drive
+                      </MenubarItem>
+
                       {modules.length > 1 && (
                         <>
                           <MenubarSeparator />
@@ -417,6 +629,8 @@ export default function GradeAssistPage() {
                 onUpdate={(update) => handleUpdateModule(activeModule.id, update)}
             />
           
+            <PwaInstallBanner />
+
             <footer className="text-center text-sm text-muted-foreground py-8 border-t">
                 <p>&copy; {new Date().getFullYear()} GradeAssist. Tous droits réservés.</p>
                 <p className="mt-1">Données sauvegardées localement. {modules.length} module(s) au total.</p>

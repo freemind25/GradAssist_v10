@@ -11,15 +11,21 @@ import { ExportButtons } from '@/components/export-buttons';
 import { Button } from '@/components/ui/button';
 import { gradeLevels, TARGET_SUM_COEFFICIENTS, DEFAULT_CRITERIA } from '@/config/grading-config';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, BookOpen, FilePlus2, GraduationCap, MinusCircle, PlusCircle, Route, Settings, UserCheck, UserPlus, Users } from 'lucide-react';
+import { AlertCircle, AlertTriangle, BarChart3, BookOpen, FilePlus2, GraduationCap, MinusCircle, PlusCircle, Route, Settings, UserCheck, UserPlus, Users } from 'lucide-react';
 import { AttendanceRegistry } from './attendance-registry';
 import { ThesisSupervision } from './thesis-supervision';
 import { SyllabusTracker } from './syllabus-tracker';
 import { SummaryExportButtons } from './summary-export-buttons';
+import { PvExport } from './pv-export';
+import { AiAssistant } from './ai-assistant';
+import { AnalyticsDashboard } from './analytics-dashboard';
+import { AtRiskStudents } from './at-risk-students';
+import { QuickNotes } from './quick-notes';
+import { WorkGroups } from './work-groups';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-type SidebarTab = 'info' | 'evaluation' | 'attendance' | 'encadrement' | 'canevas';
+type SidebarTab = 'info' | 'evaluation' | 'attendance' | 'encadrement' | 'canevas' | 'dashboard' | 'alerts';
 
 interface EvaluationModuleProps {
     module: EvaluationModuleType;
@@ -31,8 +37,11 @@ export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
     const [activeTab, setActiveTab] = useState<SidebarTab>('evaluation');
     const [allSavedEvaluations, setAllSavedEvaluations] = useState<EvaluationData[]>([]);
 
-    // Ensure thesisStudents exists (backwards compat)
+    // Ensure backwards compatibility for new fields
     const thesisStudents = module.evaluationData.thesisStudents ?? [];
+    const quickNotes = module.evaluationData.quickNotes ?? [];
+    const workGroups = module.evaluationData.workGroups ?? [];
+    const atRiskConfig = module.evaluationData.atRiskConfig ?? { attendanceThreshold: 75, gradeThreshold: 10 };
 
     const updateField = <K extends keyof EvaluationData>(field: K, value: EvaluationData[K]) => {
         onUpdate({ [field]: value });
@@ -134,6 +143,8 @@ export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
         { id: 'attendance', label: 'Présences', icon: UserCheck },
         { id: 'encadrement', label: 'Encadrement', icon: BookOpen },
         { id: 'canevas', label: 'Canevas', icon: Route },
+        { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+        { id: 'alerts', label: 'Alertes', icon: AlertTriangle },
     ];
 
     return (
@@ -168,10 +179,16 @@ export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
                         })}
                     </div>
                 </div>
-            </nav>
-
-            {/* ═══ Content Area ═══ */}
+            </nav>                {/* ═══ Content Area ═══ */}
             <div className="flex-1 min-w-0 space-y-6">
+                {/* ═══ AI Assistant ═══ */}
+                <div className="flex justify-end">
+                    <AiAssistant
+                        evaluationData={module.evaluationData}
+                        moduleName={module.name}
+                        moduleType={module.type}
+                    />
+                </div>
 
                 {/* ── Tab: Informations Générales ── */}
                 {activeTab === 'info' && (
@@ -309,6 +326,10 @@ export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
                                         maxTotalPoints={TARGET_SUM_COEFFICIENTS}
                                         evaluationSheetTitleComplement={module.evaluationData.evaluationSheetTitleComplement}
                                     />
+                                    <PvExport
+                                        evaluationData={module.evaluationData}
+                                        moduleName={module.name}
+                                    />
                                 </div>
                             </div>
 
@@ -429,6 +450,48 @@ export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
                         adminEmail={module.evaluationData.adminEmail}
                         setAdminEmail={(value) => updateField('adminEmail', value)}
                     />
+                )}
+
+                {/* ── Tab: Dashboard Analytics ── */}
+                {activeTab === 'dashboard' && (
+                    <AnalyticsDashboard
+                        evaluationData={module.evaluationData}
+                        allSavedEvaluations={allSavedEvaluations}
+                        moduleName={module.name}
+                    />
+                )}
+
+                {/* ── Tab: Alertes & Notes rapides ── */}
+                {activeTab === 'alerts' && (
+                    <div className="space-y-6">
+                        {/* Étudiants à risque */}
+                        <AtRiskStudents
+                            studentNames={module.evaluationData.studentNames}
+                            attendance={module.evaluationData.attendance}
+                            totalPoints={module.evaluationData.totalPoints}
+                            quickNotes={quickNotes}
+                            atRiskConfig={atRiskConfig}
+                        />
+
+                        {/* Notes rapides */}
+                        <QuickNotes
+                            studentNames={module.evaluationData.studentNames}
+                            quickNotes={quickNotes}
+                            onAddNote={(note) => {
+                                updateField('quickNotes', [...quickNotes, note]);
+                            }}
+                            onDeleteNote={(noteId) => {
+                                updateField('quickNotes', quickNotes.filter((n) => n.id !== noteId));
+                            }}
+                        />
+
+                        {/* Groupes de travail */}
+                        <WorkGroups
+                            studentNames={module.evaluationData.studentNames}
+                            workGroups={workGroups}
+                            onUpdate={(groups) => updateField('workGroups', groups)}
+                        />
+                    </div>
                 )}
             </div>
         </div>
