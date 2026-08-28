@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, PlusCircle, MinusCircle, ImageUp, XCircle, UserPlus, UserMinus, Mail } from "lucide-react";
+import { Upload, PlusCircle, MinusCircle, ImageUp, XCircle, UserPlus, UserMinus, Mail, KeyRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface StudentProjectInfoFormProps {
@@ -474,6 +474,26 @@ export function StudentProjectInfoForm({
           </div>
           <p className="text-[11px] text-muted-foreground">
             Adresse email pour l&apos;envoi des rapports mensuels d&apos;absences.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="mistralApiKey">Clé API Mistral AI</Label>
+          <div className="relative">
+            <Input
+              id="mistralApiKey"
+              type="password"
+              defaultValue={typeof window !== 'undefined' ? localStorage.getItem('gradeAssist_mistralApiKey') || '' : ''}
+              onChange={(e) => {
+                localStorage.setItem('gradeAssist_mistralApiKey', e.target.value);
+              }}
+              placeholder="Collez votre clé API Mistral ici"
+              className="pl-9"
+            />
+            <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Clé API pour activer l&apos;assistant IA (Mistral AI). Obtenez-la sur console.mistral.ai
           </p>
         </div>
 

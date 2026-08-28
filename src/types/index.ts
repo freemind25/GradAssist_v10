@@ -92,6 +92,15 @@ export interface EvaluationData {
 
   // Canevas de cours
   syllabus: CourseSyllabus;
+
+  // Notes rapides
+  quickNotes: QuickNote[];
+
+  // Groupes de travail
+  workGroups: WorkGroup[];
+
+  // Configuration alertes
+  atRiskConfig: AtRiskConfig;
 }
 
 export type ChapterStatus = 'not_started' | 'in_progress' | 'completed';
@@ -120,4 +129,29 @@ export interface EvaluationModule {
   name: string;
   type: ModuleType;
   evaluationData: EvaluationData;
+}
+
+// ─── Notes rapides (Quick Notes) ───
+export type QuickNoteType = 'positive' | 'negative' | 'neutral';
+
+export interface QuickNote {
+  id: string;
+  studentName: string;
+  text: string;
+  type: QuickNoteType;
+  timestamp: string; // ISO date string
+}
+
+// ─── Groupes de travail ───
+export interface WorkGroup {
+  id: string;
+  name: string;
+  color: string; // hex color for visual distinction
+  studentNames: string[];
+}
+
+// ─── Étudiants à risque ───
+export interface AtRiskConfig {
+  attendanceThreshold: number; // percentage, default 75
+  gradeThreshold: number; // out of 20, default 10
 }
