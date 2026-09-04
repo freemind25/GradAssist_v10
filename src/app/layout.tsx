@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'GradeAssist',
-  description: "Application d'évaluation universitaire pour enseignants - Notes, Présences, Encadrement",
+  description: "Application de gestion pédagogique universitaire — Évaluation, Présences, Encadrement, Tutorat & Assistant IA",
   manifest: '/manifest.json',
   themeColor: '#d97706',
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover',

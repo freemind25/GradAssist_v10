@@ -1,7 +1,7 @@
 {
-  "name": "GradeAssist - Évaluation Modulaire",
+  "name": "GradeAssist - Gestion Pédagogique Universitaire",
   "short_name": "GradeAssist",
-  "description": "Application d'évaluation universitaire pour enseignants - Notes, Présences, Encadrement, Dashboard",
+  "description": "Application de gestion pédagogique universitaire — Évaluation, Présences, Encadrement, Tutorat & Assistant IA",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",

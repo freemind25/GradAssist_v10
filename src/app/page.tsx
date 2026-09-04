@@ -13,6 +13,7 @@ import { EvaluationModule } from '@/components/evaluation-module';
 import { HelpGuideDialog } from '@/components/help-guide-dialog';
 import { GoogleDriveSync } from '@/components/google-drive-sync';
 import { saveToGoogleDrive, loadFromGoogleDrive } from '@/lib/google-drive-service';
+import { NextcloudSync } from '@/components/nextcloud-sync';
 import { TeacherLogin, getTeacher, type TeacherProfile } from '@/components/teacher-login';
 import { PwaInstallBanner } from '@/components/pwa-install';
 
@@ -432,7 +433,7 @@ export default function GradeAssistPage() {
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
                     Grade<span className="text-accent">Assist</span>
                   </h1>
-                  <p className="text-xs text-white/60 font-medium mt-0.5">Application d&apos;Évaluation Modulaire · Designed by M.SADI</p>
+                  <p className="text-xs text-white/60 font-medium mt-0.5">Gestion Pédagogique Universitaire · Designed by M.SADI</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -452,6 +453,18 @@ export default function GradeAssistPage() {
 
                 {/* Google Drive Sync */}
                 <GoogleDriveSync
+                  onDataLoaded={(data) => {
+                    if (data.modules && Array.isArray(data.modules)) {
+                      setModules(data.modules);
+                      if (data.activeModuleId) setActiveModuleId(data.activeModuleId);
+                    }
+                  }}
+                  onGetData={() => ({ modules, activeModuleId })}
+                  compact
+                />
+
+                {/* Nextcloud Sync */}
+                <NextcloudSync
                   onDataLoaded={(data) => {
                     if (data.modules && Array.isArray(data.modules)) {
                       setModules(data.modules);
