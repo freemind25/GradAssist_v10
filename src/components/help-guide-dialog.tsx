@@ -30,7 +30,7 @@ const sections = [
     color: "text-primary",
     steps: [
       "Cliquez sur « Fichier → Nouveau Module » dans la barre du haut.",
-      "Donnez un nom à la matière (ex : « Projet de Ville 2 »).",
+      "Donnez un nom à la matière (ex : « Cours », « Cours et TD », « Atelier »).",
       "Choisissez le type : Atelier (évaluation par critères) ou Matière classique (CC + Examen).",
       "Cliquez sur « Créer ». Le module apparaît dans les onglets.",
       "Vous pouvez créer plusieurs modules (matières) et naviguer entre eux via les onglets en haut.",

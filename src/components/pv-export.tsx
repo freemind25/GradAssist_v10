@@ -136,7 +136,7 @@ export function PvExport({ evaluationData, moduleName }: PvExportProps) {
     doc.setFont("helvetica", "bold");
     doc.text("Domaine:", midCol, yPos);
     doc.setFont("helvetica", "normal");
-    doc.text(d.departmentName || "Architecture, urbanisme et metiers de la ville", midCol + 20, yPos);
+    doc.text(d.departmentName || "........................................", midCol + 20, yPos);
 
     doc.setFont("helvetica", "bold");
     doc.text("Periode:", midCol, yPos + 5);

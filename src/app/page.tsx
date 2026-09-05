@@ -61,6 +61,17 @@ import { testConnection, saveToCloud, loadFromCloud, syncBidirectional } from '@
 
 const LOCALSTORAGE_MODULES_KEY = 'gradeAssist_modules';
 const LOCALSTORAGE_ACTIVE_MODULE_ID_KEY = 'gradeAssist_activeModuleId';
+const LOCALSTORAGE_VERSION_KEY = 'gradeAssist_version';
+const APP_VERSION = '2.3.0';
+
+// Default module names from older versions that should be replaced
+const OLD_DEFAULT_MODULE_NAMES = [
+  'Atelier Projet de Ville 1',
+  'Projet de Ville 1',
+  'Atelier Projet de Ville 2',
+  'Projet de Ville 2',
+  'Urbanisme',
+];
 
 const getNewEvaluationModule = (type: ModuleType, name: string): EvaluationModuleType => {
   const baseModule = {
@@ -208,12 +219,32 @@ export default function GradeAssistPage() {
         loadedModules = JSON.parse(modulesData);
       }
       
+      // Migration: check version and replace old default modules
+      const storedVersion = localStorage.getItem(LOCALSTORAGE_VERSION_KEY);
+      if (storedVersion !== APP_VERSION && Array.isArray(loadedModules) && loadedModules.length > 0) {
+        // Replace old default modules with new templates, keeping user-created ones
+        loadedModules = loadedModules.map((m) => {
+          if (OLD_DEFAULT_MODULE_NAMES.includes(m.name) && m.name === 'Atelier Projet de Ville 1') {
+            return getNewEvaluationModule('standard', 'Cours');
+          }
+          if (OLD_DEFAULT_MODULE_NAMES.includes(m.name) && m.name === 'Urbanisme') {
+            return getNewEvaluationModule('atelier', 'Cours et TD');
+          }
+          if (OLD_DEFAULT_MODULE_NAMES.includes(m.name)) {
+            return getNewEvaluationModule('atelier', 'Atelier');
+          }
+          return m;
+        });
+        localStorage.setItem(LOCALSTORAGE_VERSION_KEY, APP_VERSION);
+      }
+
       if (!Array.isArray(loadedModules) || loadedModules.length === 0) {
         loadedModules = [
           getNewEvaluationModule('standard', 'Cours'),
           getNewEvaluationModule('atelier', 'Cours et TD'),
           getNewEvaluationModule('atelier', 'Atelier'),
         ];
+        localStorage.setItem(LOCALSTORAGE_VERSION_KEY, APP_VERSION);
       }
       
       setModules(loadedModules);
