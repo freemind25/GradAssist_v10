@@ -151,7 +151,7 @@ function NewModuleDialog({ onCreate, trigger }: { onCreate: (name: string, type:
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="col-span-3"
-              placeholder="Ex: Projet de ville 1"
+              placeholder="Ex: Nom de la matière ou de l'atelier"
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -209,7 +209,11 @@ export default function GradeAssistPage() {
       }
       
       if (!Array.isArray(loadedModules) || loadedModules.length === 0) {
-        loadedModules = [getNewEvaluationModule('atelier', 'Atelier Projet de Ville 1')];
+        loadedModules = [
+          getNewEvaluationModule('standard', 'Cours'),
+          getNewEvaluationModule('atelier', 'Cours et TD'),
+          getNewEvaluationModule('atelier', 'Atelier'),
+        ];
       }
       
       setModules(loadedModules);
@@ -227,9 +231,11 @@ export default function GradeAssistPage() {
         title: "Erreur de chargement",
         description: "Impossible de charger les données locales. L'application a été réinitialisée avec les données par défaut.",
       });
-      const defaultModule = getNewEvaluationModule('atelier', 'Atelier Projet de Ville 1');
-      setModules([defaultModule]);
-      setActiveModuleId(defaultModule.id);
+      const cours = getNewEvaluationModule('standard', 'Cours');
+      const coursEtTD = getNewEvaluationModule('atelier', 'Cours et TD');
+      const atelier = getNewEvaluationModule('atelier', 'Atelier');
+      setModules([cours, coursEtTD, atelier]);
+      setActiveModuleId(cours.id);
     } finally {
       setIsLoaded(true);
     }
