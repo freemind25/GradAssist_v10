@@ -62,7 +62,7 @@ import { testConnection, saveToCloud, loadFromCloud, syncBidirectional } from '@
 const LOCALSTORAGE_MODULES_KEY = 'gradeAssist_modules';
 const LOCALSTORAGE_ACTIVE_MODULE_ID_KEY = 'gradeAssist_activeModuleId';
 const LOCALSTORAGE_VERSION_KEY = 'gradeAssist_version';
-const APP_VERSION = '2.4.0';
+const APP_VERSION = '2.5.0';
 
 // Default module names from older versions that should be replaced
 const OLD_DEFAULT_MODULE_NAMES = [

@@ -43,8 +43,8 @@ function mimeFor(filePath) {
 // ── Resolve the standalone app root ───────────────────────────────────────────
 function getStandaloneRoot() {
   if (isDev) {
-    // In dev mode, the standalone output is at .next/standalone/
-    return path.join(__dirname, "..", ".next", "standalone");
+    // In dev mode, the static export output is at out/ (output: 'export')
+    return path.join(__dirname, "..", "out");
   }
   // In production (packaged), the standalone files are in extraResources → app/
   return path.join(process.resourcesPath, "app");

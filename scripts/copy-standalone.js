@@ -1,9 +1,13 @@
 /**
  * copy-standalone.js
  *
- * Copies the Next.js standalone output, static assets, and public files
- * into electron/standalone/ so electron-builder can bundle them as
- * extraResources.
+ * Copies the Next.js static export output (out/) into electron/standalone/
+ * so electron-builder can bundle it as extraResources.
+ *
+ * With next.config.ts output: 'export', `next build` produces a fully static
+ * site in out/ (index.html, _next/static/*, public assets at the root).
+ * electron/main.js serves that directory over a local HTTP server, which is
+ * what fixes the previous blank "Not Found" window.
  *
  * Usage: node scripts/copy-standalone.js
  */
@@ -12,10 +16,7 @@ const fs = require("fs");
 const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
-const STANDALONE_SRC = path.join(ROOT, ".next", "standalone");
-const STATIC_SRC = path.join(ROOT, ".next", "static");
-const PUBLIC_SRC = path.join(ROOT, "public");
-
+const EXPORT_SRC = path.join(ROOT, "out");
 const DEST = path.join(ROOT, "electron", "standalone");
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -26,8 +27,7 @@ function mkdirp(dir) {
 
 function copyDirSync(src, dest) {
   if (!fs.existsSync(src)) {
-    console.warn(`  ⚠ Source not found, skipping: ${src}`);
-    return;
+    throw new Error(`Source not found: ${src} — run \`npx next build\` first.`);
   }
   mkdirp(dest);
 
@@ -46,7 +46,7 @@ function copyDirSync(src, dest) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-console.log("📦 Copying Next.js standalone output for Electron packaging…");
+console.log("📦 Copying Next.js static export (out/) for Electron packaging…");
 
 // Clean previous output
 if (fs.existsSync(DEST)) {
@@ -54,16 +54,17 @@ if (fs.existsSync(DEST)) {
   console.log("  🗑  Cleaned previous electron/standalone/");
 }
 
-// 1. Copy standalone directory (Next.js server + pages)
-console.log("  📂 Copying .next/standalone/ → electron/standalone/");
-copyDirSync(STANDALONE_SRC, DEST);
+// 1. Copy the static export (index.html, _next/static, public assets…)
+console.log("  📂 Copying out/ → electron/standalone/");
+copyDirSync(EXPORT_SRC, DEST);
 
-// 2. Copy static assets (_next/static → electron/standalone/.next/static)
-console.log("  📂 Copying .next/static/ → electron/standalone/.next/static/");
-copyDirSync(STATIC_SRC, path.join(DEST, ".next", "static"));
+// 2. Sanity check: the app entry point MUST exist, otherwise the packaged
+//    window shows a blank "Not Found" page.
+if (!fs.existsSync(path.join(DEST, "index.html"))) {
+  throw new Error("index.html missing from out/ — static export failed.");
+}
+if (!fs.existsSync(path.join(DEST, "_next", "static"))) {
+  throw new Error("_next/static missing from out/ — static export failed.");
+}
 
-// 3. Copy public assets
-console.log("  📂 Copying public/ → electron/standalone/public/");
-copyDirSync(PUBLIC_SRC, path.join(DEST, "public"));
-
-console.log("✅ Standalone output copied successfully.");
+console.log("✅ Static export copied successfully (index.html + _next/static present).");
