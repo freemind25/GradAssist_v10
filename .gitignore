@@ -8,6 +8,10 @@ node_modules/
 out/
 build/
 dist/
+dist-electron/
+
+# ── Build Electron (généré par scripts/copy-standalone.js) ──────────
+electron/standalone/
 
 # ── Archives ──────────────────────────────────────────────────────────
 *.tar.gz
