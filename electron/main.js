@@ -1,24 +1,114 @@
 const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
-const url = require('url');
+const http = require('http');
+const fs = require('fs');
 
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
+let server;
 
-// Determine the path to the static export
-// When packaged, the standalone directory is in extraResources
-// When developing, it's in the project root
-const isDev = !app.isPackaged;
+// MIME types for static files
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.eot': 'application/vnd.ms-fontobject',
+  '.otf': 'font/otf',
+  '.webp': 'image/webp',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
+};
 
 function getStaticPath() {
-  if (isDev) {
+  if (!app.isPackaged) {
     return path.join(__dirname, 'standalone');
   }
-  // In production, extraResources are copied to resources/app
   return path.join(process.resourcesPath, 'app');
 }
 
+/**
+ * Create a local HTTP server to serve static files.
+ * Google OAuth requires HTTP context, not file:// protocol.
+ */
+function createLocalServer(staticPath, port) {
+  return new Promise((resolve, reject) => {
+    const httpServer = http.createServer((req, res) => {
+      let url = decodeURIComponent(req.url);
+
+      // Default to index.html
+      if (url === '/' || url === '') {
+        url = '/index.html';
+      }
+
+      // Remove query strings
+      url = url.split('?')[0];
+
+      const filePath = path.join(staticPath, url);
+
+      // Security: prevent directory traversal
+      if (!filePath.startsWith(staticPath)) {
+        res.writeHead(403);
+        res.end('Forbidden');
+        return;
+      }
+
+      fs.stat(filePath, (err, stats) => {
+        if (err || !stats.isFile()) {
+          // SPA fallback: serve index.html for unknown routes
+          const indexPath = path.join(staticPath, 'index.html');
+          fs.readFile(indexPath, (err2, data) => {
+            if (err2) {
+              res.writeHead(404);
+              res.end('Not Found');
+              return;
+            }
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end(data);
+          });
+          return;
+        }
+
+        const ext = path.extname(filePath).toLowerCase();
+        const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+
+        fs.readFile(filePath, (err3, data) => {
+          if (err3) {
+            res.writeHead(500);
+            res.end('Internal Server Error');
+            return;
+          }
+          res.writeHead(200, { 'Content-Type': contentType });
+          res.end(data);
+        });
+      });
+    });
+
+    httpServer.listen(port, '127.0.0.1', () => {
+      console.log(`GradeAssist server running at http://localhost:${port}`);
+      resolve(httpServer);
+    });
+
+    httpServer.on('error', (error) => {
+      reject(error);
+    });
+  });
+}
+
 function createWindow() {
+  const staticPath = getStaticPath();
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -31,21 +121,27 @@ function createWindow() {
       contextIsolation: true,
     },
     autoHideMenuBar: false,
-    show: false, // Don't show until ready
+    show: false,
   });
 
-  const staticPath = getStaticPath();
-  const indexPath = path.join(staticPath, 'index.html');
+  // Load from local HTTP server (required for Google OAuth)
+  const port = 9876 + Math.floor(Math.random() * 100); // Random port to avoid conflicts
+  createLocalServer(staticPath, port)
+    .then((httpServer) => {
+      server = httpServer;
+      mainWindow.loadURL(`http://127.0.0.1:${port}`);
+    })
+    .catch((error) => {
+      console.error('Failed to start local server:', error);
+      // Fallback: try loading file directly (OAuth won't work)
+      const indexPath = path.join(staticPath, 'index.html');
+      mainWindow.loadFile(indexPath);
+    });
 
-  // Load the index.html from the static export
-  mainWindow.loadFile(indexPath);
-
-  // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
   });
 
-  // Handle external links - open in default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
@@ -63,7 +159,6 @@ if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    // If user tries to open a second instance, focus the existing window
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
@@ -82,6 +177,10 @@ if (!gotTheLock) {
 }
 
 app.on('window-all-closed', () => {
+  // Close the local HTTP server
+  if (server) {
+    server.close();
+  }
   if (process.platform !== 'darwin') {
     app.quit();
   }
