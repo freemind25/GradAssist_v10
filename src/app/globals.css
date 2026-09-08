@@ -179,6 +179,14 @@ body {
   background: hsl(36 90% 55%);
   color: hsl(222 47% 10%);
 }
+.badge-mooc {
+  background: hsl(142 71% 35%);
+  color: white;
+}
+.dark .badge-mooc {
+  background: hsl(142 71% 40%);
+  color: white;
+}
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {

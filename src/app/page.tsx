@@ -1,9 +1,8 @@
-
 "use client";
 
 import type * as React from 'react';
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { BookCopy, Plus, FolderPlus, Trash2, Cloud, CloudOff, RefreshCw, Download, Upload, HardDrive } from "lucide-react";
+import { BookCopy, Plus, FolderPlus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DEFAULT_CRITERIA, TARGET_SUM_COEFFICIENTS } from "@/config/grading-config";
 import type { EvaluationData, EvaluationModule as EvaluationModuleType, ModuleType } from "@/types";
@@ -11,9 +10,6 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { EvaluationModule } from '@/components/evaluation-module';
 import { HelpGuideDialog } from '@/components/help-guide-dialog';
-import { GoogleDriveSync } from '@/components/google-drive-sync';
-import { saveToGoogleDrive, loadFromGoogleDrive } from '@/lib/google-drive-service';
-import { NextcloudSync } from '@/components/nextcloud-sync';
 import { TeacherLogin, getTeacher, type TeacherProfile } from '@/components/teacher-login';
 import { PwaInstallBanner } from '@/components/pwa-install';
 
@@ -57,12 +53,10 @@ import {
 } from "@/components/ui/select";
 
 
-import { testConnection, saveToCloud, loadFromCloud, syncBidirectional } from '@/lib/sync-service';
-
 const LOCALSTORAGE_MODULES_KEY = 'gradeAssist_modules';
 const LOCALSTORAGE_ACTIVE_MODULE_ID_KEY = 'gradeAssist_activeModuleId';
 const LOCALSTORAGE_VERSION_KEY = 'gradeAssist_version';
-const APP_VERSION = '2.6.0';
+const APP_VERSION = '2.7.0';
 
 // Default module names from older versions that should be replaced
 const OLD_DEFAULT_MODULE_NAMES = [
@@ -71,16 +65,19 @@ const OLD_DEFAULT_MODULE_NAMES = [
   'Atelier Projet de Ville 2',
   'Projet de Ville 2',
   'Urbanisme',
+  'Cours',
+  'Cours et TD',
+  'Atelier',
 ];
 
 const getNewEvaluationModule = (type: ModuleType, name: string): EvaluationModuleType => {
   const baseModule = {
-    id: `module_${Date.now()}`,
+    id: `module_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     name: name,
     type: type,
     evaluationData: {
       id: `eval_${Date.now()}`,
-      studentNames: ["Étudiant 1", "Étudiant 2", "Étudiant 3"],
+      studentNames: [],
       teacherNames: [""],
       projectName: "",
       studyLevel: "",
@@ -95,7 +92,7 @@ const getNewEvaluationModule = (type: ModuleType, name: string): EvaluationModul
       selectedGrades: {},
       totalPoints: 0,
       evaluationSheetTitleComplement: "...............................................................",
-      criteria: DEFAULT_CRITERIA,
+      criteria: type === 'atelier' ? DEFAULT_CRITERIA : [],
       attendance: {},
       thesisStudents: [],
       adminEmail: "",
@@ -104,9 +101,9 @@ const getNewEvaluationModule = (type: ModuleType, name: string): EvaluationModul
       workGroups: [],
       tutoringSessions: [],
       atRiskConfig: { attendanceThreshold: 75, gradeThreshold: 10 },
-      continuousAssessmentGrade: type === 'standard' ? 10 : undefined,
-      examGrade: type === 'standard' ? 10 : undefined,
-      continuousAssessmentWeight: type === 'standard' ? 40 : undefined,
+      continuousAssessmentGrade: (type === 'standard' || type === 'mooc') ? 10 : undefined,
+      examGrade: (type === 'standard' || type === 'mooc') ? 10 : undefined,
+      continuousAssessmentWeight: (type === 'standard' || type === 'mooc') ? 40 : undefined,
     },
   };
 
@@ -183,6 +180,10 @@ function NewModuleDialog({ onCreate, trigger }: { onCreate: (name: string, type:
                 <RadioGroupItem value="standard" id="r-standard" />
                 <Label htmlFor="r-standard" className='font-normal'>Matière Classique (CC + Examen)</Label>
               </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="mooc" id="r-mooc" />
+                <Label htmlFor="r-mooc" className='font-normal'>Cours en ligne MOOC (CC + Examen)</Label>
+              </div>
             </RadioGroup>
           </div>
         </div>
@@ -197,15 +198,102 @@ function NewModuleDialog({ onCreate, trigger }: { onCreate: (name: string, type:
   );
 }
 
+// Dialog for configuring an existing blank module (rename + choose type)
+function ConfigureModuleDialog({ module, onConfigure, onDismiss }: { 
+  module: EvaluationModuleType;
+  onConfigure: (moduleId: string, name: string, type: ModuleType) => void;
+  onDismiss: () => void;
+}) {
+  const [isOpen, setIsOpen] = useState(true);
+  const [name, setName] = useState(module.name === "Nouvelle matière" ? "" : module.name);
+  const [type, setType] = useState<ModuleType>(module.type);
+  const { toast } = useToast();
+
+  const handleConfigure = () => {
+    if (!name.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Nom manquant",
+        description: "Veuillez donner un nom à la matière.",
+      });
+      return;
+    }
+    onConfigure(module.id, name, type);
+    setIsOpen(false);
+  };
+
+  const handleDismiss = () => {
+    setIsOpen(false);
+    onDismiss();
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleDismiss(); }}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Configurer la matière</DialogTitle>
+          <DialogDescription>
+            Donnez un nom et choisissez le type d&apos;évaluation.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="config-name" className="text-right">
+              Nom
+            </Label>
+            <Input
+              id="config-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="col-span-3"
+              placeholder="Ex: Mathématiques, Physique..."
+              autoFocus
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right">
+              Type
+            </Label>
+            <RadioGroup
+              className="col-span-3 flex flex-col gap-2"
+              onValueChange={(value: ModuleType) => setType(value)}
+              value={type}
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="atelier" id="c-atelier" />
+                <Label htmlFor="c-atelier" className='font-normal'>Atelier (Évaluation par critères)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="standard" id="c-standard" />
+                <Label htmlFor="c-standard" className='font-normal'>Matière Classique (CC + Examen)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="mooc" id="c-mooc" />
+                <Label htmlFor="c-mooc" className='font-normal'>Cours en ligne MOOC (CC + Examen)</Label>
+              </div>
+            </RadioGroup>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={handleDismiss}>Annuler</Button>
+          <Button onClick={handleConfigure}>
+            <Plus className="mr-2 h-4 w-4" />
+            Configurer
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 export default function GradeAssistPage() {
   const [modules, setModules] = useState<EvaluationModuleType[]>([]);
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [isCloudConnected, setIsCloudConnected] = useState<boolean | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [teacher, setTeacherState] = useState<TeacherProfile | null>(null);
   const [teacherChecked, setTeacherChecked] = useState(false);
+  const [configuringModuleId, setConfiguringModuleId] = useState<string | null>(null);
   
   const { toast } = useToast();
 
@@ -222,16 +310,9 @@ export default function GradeAssistPage() {
       // Migration: check version and replace old default modules
       const storedVersion = localStorage.getItem(LOCALSTORAGE_VERSION_KEY);
       if (storedVersion !== APP_VERSION && Array.isArray(loadedModules) && loadedModules.length > 0) {
-        // Replace old default modules with new templates, keeping user-created ones
         loadedModules = loadedModules.map((m) => {
-          if (OLD_DEFAULT_MODULE_NAMES.includes(m.name) && m.name === 'Atelier Projet de Ville 1') {
-            return getNewEvaluationModule('standard', 'Cours');
-          }
-          if (OLD_DEFAULT_MODULE_NAMES.includes(m.name) && m.name === 'Urbanisme') {
-            return getNewEvaluationModule('atelier', 'Cours et TD');
-          }
           if (OLD_DEFAULT_MODULE_NAMES.includes(m.name)) {
-            return getNewEvaluationModule('atelier', 'Atelier');
+            return getNewEvaluationModule('atelier', 'Nouvelle matière');
           }
           return m;
         });
@@ -240,9 +321,9 @@ export default function GradeAssistPage() {
 
       if (!Array.isArray(loadedModules) || loadedModules.length === 0) {
         loadedModules = [
-          getNewEvaluationModule('standard', 'Cours'),
-          getNewEvaluationModule('atelier', 'Cours et TD'),
-          getNewEvaluationModule('atelier', 'Atelier'),
+          getNewEvaluationModule('atelier', 'Nouvelle matière'),
+          getNewEvaluationModule('standard', 'Nouvelle matière'),
+          getNewEvaluationModule('mooc', 'Nouvelle matière'),
         ];
         localStorage.setItem(LOCALSTORAGE_VERSION_KEY, APP_VERSION);
       }
@@ -256,17 +337,17 @@ export default function GradeAssistPage() {
       setActiveModuleId(activeId);
 
     } catch (error) {
-      console.error("Failed to load data from localStorage. This could be due to corrupted data or browser restrictions.", error);
+      console.error("Failed to load data from localStorage.", error);
       toast({
         variant: "destructive",
         title: "Erreur de chargement",
-        description: "Impossible de charger les données locales. L'application a été réinitialisée avec les données par défaut.",
+        description: "Impossible de charger les données locales. L'application a été réinitialisée.",
       });
-      const cours = getNewEvaluationModule('standard', 'Cours');
-      const coursEtTD = getNewEvaluationModule('atelier', 'Cours et TD');
-      const atelier = getNewEvaluationModule('atelier', 'Atelier');
-      setModules([cours, coursEtTD, atelier]);
-      setActiveModuleId(cours.id);
+      const m1 = getNewEvaluationModule('atelier', 'Nouvelle matière');
+      const m2 = getNewEvaluationModule('standard', 'Nouvelle matière');
+      const m3 = getNewEvaluationModule('mooc', 'Nouvelle matière');
+      setModules([m1, m2, m3]);
+      setActiveModuleId(m1.id);
     } finally {
       setIsLoaded(true);
     }
@@ -285,98 +366,49 @@ export default function GradeAssistPage() {
     return () => clearTimeout(handler);
   }, [modules, activeModuleId, isLoaded]);
 
-  // Vérifier la connexion cloud au montage
-  useEffect(() => {
-    testConnection().then((status) => {
-      setIsCloudConnected(status.connected);
-    });
-  }, []);
-
-  // Vérifier si l'enseignant est connecté
+  // Check teacher login
   useEffect(() => {
     const t = getTeacher();
     setTeacherState(t);
     setTeacherChecked(true);
   }, []);
 
-  // Auto-sync au démarrage si connecté au cloud
-  useEffect(() => {
-    if (!isLoaded || !isCloudConnected) return;
-    const timeout = setTimeout(() => {
-      syncBidirectional().then((result) => {
-        if (result.success && result.modulesSynced && result.modulesSynced > 0) {
-          const modulesJson = localStorage.getItem(LOCALSTORAGE_MODULES_KEY);
-          if (modulesJson) {
-            setModules(JSON.parse(modulesJson));
-          }
-        }
-      }).catch(() => {});
-    }, 2000);
-    return () => clearTimeout(timeout);
-  }, [isLoaded, isCloudConnected]);
-
-  // Handlers de synchronisation
-  const handleSyncToCloud = useCallback(async () => {
-    setIsSyncing(true);
-    try {
-      const result = await saveToCloud();
-      toast({
-        title: result.success ? "Synchronisation réussie" : "Erreur",
-        description: result.message,
-        variant: result.success ? "default" : "destructive",
-      });
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [toast]);
-
-  const handleSyncFromCloud = useCallback(async () => {
-    setIsSyncing(true);
-    try {
-      const result = await loadFromCloud();
-      if (result.success && result.modulesSynced && result.modulesSynced > 0) {
-        // Recharger les modules depuis localStorage
-        const modulesJson = localStorage.getItem(LOCALSTORAGE_MODULES_KEY);
-        if (modulesJson) {
-          const loadedModules = JSON.parse(modulesJson);
-          setModules(loadedModules);
-        }
-      }
-      toast({
-        title: result.success ? "Chargement réussi" : "Erreur",
-        description: result.message,
-        variant: result.success ? "default" : "destructive",
-      });
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [toast]);
-
-  const handleSyncBidirectional = useCallback(async () => {
-    setIsSyncing(true);
-    try {
-      const result = await syncBidirectional();
-      if (result.success) {
-        // Recharger les modules depuis localStorage
-        const modulesJson = localStorage.getItem(LOCALSTORAGE_MODULES_KEY);
-        if (modulesJson) {
-          const loadedModules = JSON.parse(modulesJson);
-          setModules(loadedModules);
-        }
-      }
-      toast({
-        title: result.success ? "Synchronisation terminée" : "Erreur",
-        description: result.message,
-        variant: result.success ? "default" : "destructive",
-      });
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [toast]);
-
-
-
   const activeModule = useMemo(() => modules.find(m => m.id === activeModuleId), [modules, activeModuleId]);
+
+  // Check if the active module is a blank/unconfigured module
+  const isModuleBlank = useMemo(() => {
+    if (!activeModule) return false;
+    return activeModule.name === 'Nouvelle matière' && 
+           !activeModule.evaluationData.universityName &&
+           activeModule.evaluationData.studentNames.length === 0;
+  }, [activeModule]);
+
+  // Auto-trigger configuration dialog for blank modules
+  useEffect(() => {
+    if (isLoaded && isModuleBlank && activeModule && !configuringModuleId) {
+      setConfiguringModuleId(activeModule.id);
+    }
+  }, [isLoaded, isModuleBlank, activeModule, configuringModuleId]);
+
+  const handleConfigureModule = useCallback((moduleId: string, name: string, type: ModuleType) => {
+    setModules(prevModules => {
+      return prevModules.map(module => {
+        if (module.id === moduleId) {
+          return { ...module, name, type };
+        }
+        return module;
+      });
+    });
+    setConfiguringModuleId(null);
+    toast({
+      title: "Matière configurée",
+      description: `La matière "${name}" a été configurée.`,
+    });
+  }, [toast]);
+
+  const handleTabClick = useCallback((moduleId: string) => {
+    setActiveModuleId(moduleId);
+  }, []);
 
   const handleUpdateModule = useCallback((moduleId: string, update: Partial<EvaluationData>) => {
     setModules(prevModules => {
@@ -434,9 +466,8 @@ export default function GradeAssistPage() {
     });
     toast({ title: "Module Supprimé", description: "Le module a été supprimé." });
   }, [modules.length, activeModuleId, toast]);
-  
 
-  // Afficher l'écran de connexion enseignant si pas encore identifié
+  // Show teacher login screen if not yet identified
   if (teacherChecked && !teacher) {
     return <TeacherLogin onLogin={(profile) => setTeacherState(profile)} />;
   }
@@ -452,7 +483,7 @@ export default function GradeAssistPage() {
 
   return (
     <div className="min-h-screen">
-        {/* ═══ Premium Gradient Header ═══ */}
+        {/* Premium Gradient Header */}
         <header className="relative overflow-hidden bg-gradient-to-r from-[hsl(var(--header-gradient-from))] to-[hsl(var(--header-gradient-to))] text-primary-foreground">
           {/* Decorative circles */}
           <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-accent/10 blur-3xl" />
@@ -488,44 +519,6 @@ export default function GradeAssistPage() {
                   </div>
                 )}
 
-                {/* Google Drive Sync */}
-                <GoogleDriveSync
-                  onDataLoaded={(data) => {
-                    if (data.modules && Array.isArray(data.modules)) {
-                      setModules(data.modules);
-                      if (data.activeModuleId) setActiveModuleId(data.activeModuleId);
-                    }
-                  }}
-                  onGetData={() => ({ modules, activeModuleId })}
-                  compact
-                />
-
-                {/* Nextcloud Sync */}
-                <NextcloudSync
-                  onDataLoaded={(data) => {
-                    if (data.modules && Array.isArray(data.modules)) {
-                      setModules(data.modules);
-                      if (data.activeModuleId) setActiveModuleId(data.activeModuleId);
-                    }
-                  }}
-                  onGetData={() => ({ modules, activeModuleId })}
-                  compact
-                />
-
-                {/* Indicateur de connexion cloud */}
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/10 border border-white/15">
-                  {isCloudConnected === null ? (
-                    <RefreshCw className="h-3.5 w-3.5 text-white/50 animate-spin" />
-                  ) : isCloudConnected ? (
-                    <Cloud className="h-3.5 w-3.5 text-emerald-400" />
-                  ) : (
-                    <CloudOff className="h-3.5 w-3.5 text-white/50" />
-                  )}
-                  <span className="text-xs text-white/70 hidden sm:inline">
-                    {isCloudConnected === null ? '...' : isCloudConnected ? 'Cloud' : 'Local'}
-                  </span>
-                </div>
-
                 <Menubar className="bg-white/10 border-white/15 text-white hover:bg-white/15">
                   <MenubarMenu>
                     <MenubarTrigger className="text-white/90 hover:text-white data-[state=open]:bg-white/15">
@@ -535,75 +528,11 @@ export default function GradeAssistPage() {
                     <MenubarContent>
                       <NewModuleDialog onCreate={handleCreateModule} />
                       <MenubarSeparator />
-                      <MenubarItem onClick={handleSyncBidirectional} disabled={isSyncing || !isCloudConnected}>
-                        <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                        Synchroniser avec Cloud
-                      </MenubarItem>
-                      <MenubarItem onClick={handleSyncToCloud} disabled={isSyncing || !isCloudConnected}>
-                        <Upload className="mr-2 h-4 w-4" />
-                        Envoyer vers Cloud
-                      </MenubarItem>
-                      <MenubarItem onClick={handleSyncFromCloud} disabled={isSyncing || !isCloudConnected}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Charger depuis Cloud
-                      </MenubarItem>
-                      <MenubarSeparator />
-                      <MenubarItem onClick={async () => {
-                        const result = await saveToGoogleDrive({ modules, activeModuleId });
-                        toast({ title: result.success ? "Sauvegardé" : "Erreur", description: result.message, variant: result.success ? "default" : "destructive" });
-                      }}>
-                        <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none">
-                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                        </svg>
-                        Sauvegarder sur Google Drive
-                      </MenubarItem>
-                      <MenubarItem onClick={async () => {
-                        const result = await loadFromGoogleDrive();
-                        if (result.success && result.data?.modules) {
-                          setModules(result.data.modules);
-                          if (result.data.activeModuleId) setActiveModuleId(result.data.activeModuleId);
-                        }
-                        toast({ title: result.success ? "Chargé" : "Erreur", description: result.message, variant: result.success ? "default" : "destructive" });
-                      }}>
-                        <HardDrive className="mr-2 h-4 w-4" />
-                        Charger depuis Google Drive
-                      </MenubarItem>
-                      <MenubarSeparator />
-                      <MenubarItem onClick={async () => {
-                        const result = await saveToGoogleDrive({ modules, activeModuleId });
-                        toast({ title: result.success ? "Sauvegardé" : "Erreur", description: result.message, variant: result.success ? "default" : "destructive" });
-                      }}>
-                        <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none">
-                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                        </svg>
-                        Sauvegarder sur Google Drive
-                      </MenubarItem>
-                      <MenubarItem onClick={async () => {
-                        const result = await loadFromGoogleDrive();
-                        if (result.success && result.data?.modules) {
-                          setModules(result.data.modules);
-                          if (result.data.activeModuleId) setActiveModuleId(result.data.activeModuleId);
-                        }
-                        toast({ title: result.success ? "Chargé" : "Erreur", description: result.message, variant: result.success ? "default" : "destructive" });
-                      }}>
-                        <HardDrive className="mr-2 h-4 w-4" />
-                        Charger depuis Google Drive
-                      </MenubarItem>
-
                       {modules.length > 1 && (
-                        <>
-                          <MenubarSeparator />
-                          <MenubarItem onClick={() => handleDeleteModule(activeModule.id)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Supprimer le module actif
-                          </MenubarItem>
-                        </>
+                        <MenubarItem onClick={() => handleDeleteModule(activeModule.id)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Supprimer le module actif
+                        </MenubarItem>
                       )}
                     </MenubarContent>
                   </MenubarMenu>
@@ -613,14 +542,15 @@ export default function GradeAssistPage() {
           </div>
         </header>
 
-        {/* ═══ Module Tabs Bar ═══ */}
+        {/* Module Tabs Bar */}
         <div className="bg-card border-b sticky top-0 z-30">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2 py-2 overflow-x-auto">
               {modules.map(module => (
                 <button
                   key={module.id}
-                  onClick={() => setActiveModuleId(module.id)}
+                  onClick={() => handleTabClick(module.id)}
+                  onDoubleClick={() => setConfiguringModuleId(module.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                     module.id === activeModuleId
                       ? 'bg-primary text-primary-foreground shadow-md'
@@ -630,9 +560,9 @@ export default function GradeAssistPage() {
                   <BookCopy className="h-4 w-4" />
                   {module.name}
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
-                    module.type === 'atelier' ? 'badge-atelier' : 'badge-matiere'
+                    module.type === 'atelier' ? 'badge-atelier' : module.type === 'mooc' ? 'badge-mooc' : 'badge-matiere'
                   }`}>
-                    {module.type === 'atelier' ? 'ATELIER' : 'MATIÈRE'}
+                    {module.type === 'atelier' ? 'ATELIER' : module.type === 'mooc' ? 'MOOC' : 'MATIÈRE'}
                   </span>
                 </button>
               ))}
@@ -672,6 +602,15 @@ export default function GradeAssistPage() {
             </div>
           </div>
         </div>
+
+        {/* Configure Module Dialog (for blank modules) */}
+        {configuringModuleId && (
+          <ConfigureModuleDialog
+            module={modules.find(m => m.id === configuringModuleId)!}
+            onConfigure={handleConfigureModule}
+            onDismiss={() => setConfiguringModuleId(null)}
+          />
+        )}
 
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
             <EvaluationModule

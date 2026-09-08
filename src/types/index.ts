@@ -125,7 +125,7 @@ export interface CourseSyllabus {
   pdfDataUrl: string | null; // stored as base64 data URL
 }
 
-export type ModuleType = 'atelier' | 'standard';
+export type ModuleType = 'atelier' | 'standard' | 'mooc';
 
 export interface EvaluationModule {
   id: string;
