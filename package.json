@@ -19,7 +19,7 @@
     "electron:build": "next build && node scripts/copy-standalone.js && electron-builder --win --publish never",
     "electron:pack": "next build && node scripts/copy-standalone.js && electron-builder --win --dir --publish never"
   },
-  "description": "Application de gestion des notes",
+  "description": "Application de gestion pédagogique universitaire — Évaluation, Présences, Encadrement, Tutorat & Assistant IA",
   "author": "GradeAssist Team",
   "build": {
     "appId": "com.gradeassist.app",

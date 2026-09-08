@@ -1,8 +1,8 @@
-# 🎓 GradeAssist — Application d'Évaluation Modulaire
+# 🎓 GradeAssist — Application de Gestion Pédagogique Universitaire
 
-**L'outil tout-en-un pour les enseignants et jurys universitaires.**
+**Évaluation, Présences, Encadrement, Tutorat & Assistant IA — L'outil tout-en-un pour les enseignants et jurys universitaires.**
 
-GradeAssist facilite et standardise le processus d'évaluation des travaux d'atelier et projets étudiants. Saisissez vos grilles de notation, gérez les présences, et générez des fiches d'évaluation professionnelles — le tout en quelques clics, 100 % hors ligne.
+GradeAssist est une application complète de gestion pédagogique qui facilite et standardise le processus d'évaluation, la gestion des présences, l'encadrement et le tutorat des étudiants universitaires. Saisissez vos grilles de notation, gérez les présences, et générez des fiches d'évaluation professionnelles — le tout en quelques clics, 100 % hors ligne.
 
 ---
 
