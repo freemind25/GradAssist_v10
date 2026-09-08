@@ -125,7 +125,8 @@ function createWindow() {
   });
 
   // Load from local HTTP server (required for Google OAuth)
-  const port = 9876 + Math.floor(Math.random() * 100); // Random port to avoid conflicts
+  // Fixed port required: Google Cloud Console must have this origin authorized
+  const port = 18529;
   createLocalServer(staticPath, port)
     .then((httpServer) => {
       server = httpServer;
