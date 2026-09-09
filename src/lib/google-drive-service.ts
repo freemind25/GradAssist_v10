@@ -9,7 +9,11 @@
 const DRIVE_TOKEN_KEY_PREFIX = 'gradeAssist_gdrive_';
 const DRIVE_EMAIL_KEY = 'gradeAssist_gdrive_email';
 const DRIVE_FOLDER_KEY = 'gradeAssist_gdrive_folder_id';
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+// drive.file: the app can only see files IT created — never the whole Drive.
+// userinfo.email: lets the app identify which teacher is connected.
+const DRIVE_SCOPE =
+  'https://www.googleapis.com/auth/drive.file ' +
+  'https://www.googleapis.com/auth/userinfo.email';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 
 // The client ID is a public identifier (safe to embed in the browser bundle).
@@ -172,7 +176,9 @@ export async function signInWithGoogle(): Promise<DriveTokenData> {
       },
     });
 
-    client.requestAccessToken({ prompt: 'consent' });
+    // 'select_account' forces Google to show the account chooser popup,
+    // so each teacher picks THEIR OWN account (never the browser's default).
+    client.requestAccessToken({ prompt: 'consent select_account' });
   });
 }
 
