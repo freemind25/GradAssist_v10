@@ -9,7 +9,6 @@ import type { EvaluationData, EvaluationModule as EvaluationModuleType, ModuleTy
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { EvaluationModule } from '@/components/evaluation-module';
-import { HelpGuideDialog } from '@/components/help-guide-dialog';
 import { TeacherLogin, getTeacher, type TeacherProfile } from '@/components/teacher-login';
 import { PwaInstallBanner } from '@/components/pwa-install';
 
@@ -56,7 +55,7 @@ import {
 const LOCALSTORAGE_MODULES_KEY = 'gradeAssist_modules';
 const LOCALSTORAGE_ACTIVE_MODULE_ID_KEY = 'gradeAssist_activeModuleId';
 const LOCALSTORAGE_VERSION_KEY = 'gradeAssist_version';
-const APP_VERSION = '2.7.0';
+const APP_VERSION = '2.8.0';
 
 // Default module names from older versions that should be replaced
 const OLD_DEFAULT_MODULE_NAMES = [
@@ -505,8 +504,6 @@ export default function GradeAssistPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <HelpGuideDialog />
-
                 {/* Teacher profile badge */}
                 {teacher && (
                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/10 border border-white/15" title={`${teacher.name} — ${teacher.email}`}>
@@ -617,6 +614,14 @@ export default function GradeAssistPage() {
                 key={activeModule.id}
                 module={activeModule}
                 onUpdate={(update) => handleUpdateModule(activeModule.id, update)}
+                onSave={() => {
+                    try {
+                        localStorage.setItem(LOCALSTORAGE_MODULES_KEY, JSON.stringify(modules));
+                        localStorage.setItem(LOCALSTORAGE_ACTIVE_MODULE_ID_KEY, JSON.stringify(activeModuleId));
+                    } catch (error) {
+                        console.error("Failed to save data to localStorage:", error);
+                    }
+                }}
             />
           
             <PwaInstallBanner />

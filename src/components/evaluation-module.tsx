@@ -11,7 +11,7 @@ import { ExportButtons } from '@/components/export-buttons';
 import { Button } from '@/components/ui/button';
 import { gradeLevels, TARGET_SUM_COEFFICIENTS, DEFAULT_CRITERIA } from '@/config/grading-config';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, AlertTriangle, BarChart3, BookOpen, FilePlus2, GraduationCap, MinusCircle, PlusCircle, Route, Settings, UserCheck, UserPlus, Users } from 'lucide-react';
+import { AlertCircle, AlertTriangle, BarChart3, BookOpen, FilePlus2, FileText, GraduationCap, MinusCircle, PlusCircle, Route, Settings, UserCheck, UserPlus, Users } from 'lucide-react';
 import { AttendanceRegistry } from './attendance-registry';
 import { ThesisSupervision } from './thesis-supervision';
 import { SyllabusTracker } from './syllabus-tracker';
@@ -23,17 +23,20 @@ import { AtRiskStudents } from './at-risk-students';
 import { QuickNotes } from './quick-notes';
 import { WorkGroups } from './work-groups';
 import { TutoringTracker } from './tutoring-tracker';
+import { PedagogicalReports } from './pedagogical-reports';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { Save } from 'lucide-react';
 
-type SidebarTab = 'info' | 'evaluation' | 'attendance' | 'encadrement' | 'canevas' | 'dashboard' | 'alerts' | 'tutoring';
+type SidebarTab = 'info' | 'evaluation' | 'attendance' | 'encadrement' | 'canevas' | 'dashboard' | 'alerts' | 'tutoring' | 'reports';
 
 interface EvaluationModuleProps {
     module: EvaluationModuleType;
     onUpdate: (update: Partial<EvaluationData>) => void;
+    onSave?: () => void;
 }
 
-export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
+export function EvaluationModule({ module, onUpdate, onSave }: EvaluationModuleProps) {
     const { toast } = useToast();
     const [activeTab, setActiveTab] = useState<SidebarTab>('evaluation');
     const [allSavedEvaluations, setAllSavedEvaluations] = useState<EvaluationData[]>([]);
@@ -148,6 +151,7 @@ export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
         { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
         { id: 'alerts', label: 'Alertes', icon: AlertTriangle },
         { id: 'tutoring', label: 'Tutorat', icon: GraduationCap },
+        { id: 'reports', label: 'Rapports', icon: FileText },
     ];
 
     return (
@@ -180,6 +184,21 @@ export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
                                 </button>
                             );
                         })}
+                    </div>
+                    {/* Save Button */}
+                    <div className="p-3 border-t">
+                        <button
+                            onClick={() => {
+                                if (onSave) {
+                                    onSave();
+                                }
+                                toast({ title: "Sauvegardé", description: "Les données ont été sauvegardées avec succès." });
+                            }}
+                            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                        >
+                            <Save className="h-4 w-4" />
+                            Sauvegarder
+                        </button>
                     </div>
                 </div>
             </nav>                {/* ═══ Content Area ═══ */}
@@ -503,6 +522,15 @@ export function EvaluationModule({ module, onUpdate }: EvaluationModuleProps) {
                         studentNames={module.evaluationData.studentNames}
                         sessions={tutoringSessions}
                         onUpdate={(sessions) => updateField('tutoringSessions', sessions)}
+                    />
+                )}
+
+                {/* ── Tab: Rapports Pédagogiques ── */}
+                {activeTab === 'reports' && (
+                    <PedagogicalReports
+                        evaluationData={module.evaluationData}
+                        moduleName={module.name}
+                        moduleType={module.type}
                     />
                 )}
             </div>
