@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import type { EvaluationData, ModuleType, SyllabusChapter, TutoringSession, TutoringSessionType, ThesisStudent } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -118,7 +118,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
     };
   }, [evaluationData.attendance]);
 
-  const handleExportReport = useCallback(async (reportType: string) => {
+  const handleExportReport = async (reportType: string) => {
     let content = '';
     const now = new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' });
     const defaultFileName = `Rapport_${reportType === 'course' ? 'Cours' : 'Encadrement'}_${moduleName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.txt`;
@@ -251,7 +251,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
     a.download = defaultFileName;
     a.click();
     URL.revokeObjectURL(url);
-  }, [moduleName, moduleType, evaluationData, progress, attendanceStats, chapters, thesisStudents, tutoringSessions]);
+  };
 
   return (
     <div className="space-y-6">
