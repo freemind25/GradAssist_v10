@@ -30,7 +30,6 @@ function ensureSql() {
 }
 
 // Export sql as a tagged template function that lazily delegates to the Neon client
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function sql(strings: TemplateStringsArray, ...values: any[]): any {
   return ensureSql()(strings, ...values);
 }
