@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { EvaluationModule } from '@/components/evaluation-module';
 import { HelpGuideDialog } from '@/components/help-guide-dialog';
 import { TeacherLogin, getTeacher, type TeacherProfile } from '@/components/teacher-login';
+import { GoogleDriveSync } from '@/components/google-drive-sync';
 import { PwaInstallBanner } from '@/components/pwa-install';
 
 import {
@@ -506,6 +507,7 @@ export default function GradeAssistPage() {
               </div>
               <div className="flex items-center gap-2">
                 <HelpGuideDialog />
+                <GoogleDriveSync />
 
                 <Menubar className="bg-white/10 border-white/15 text-white hover:bg-white/15">
                   <MenubarMenu>
