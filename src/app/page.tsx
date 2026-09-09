@@ -9,6 +9,7 @@ import type { EvaluationData, EvaluationModule as EvaluationModuleType, ModuleTy
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { EvaluationModule } from '@/components/evaluation-module';
+import { HelpGuideDialog } from '@/components/help-guide-dialog';
 import { TeacherLogin, getTeacher, type TeacherProfile } from '@/components/teacher-login';
 import { PwaInstallBanner } from '@/components/pwa-install';
 
@@ -504,6 +505,8 @@ export default function GradeAssistPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <HelpGuideDialog />
+
                 {/* Teacher profile badge */}
                 {teacher && (
                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/10 border border-white/15" title={`${teacher.name} — ${teacher.email}`}>
