@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useMemo } from 'react';
+import { uploadToDrive, isDriveConnected } from '@/lib/google-drive-service';
 import type { EvaluationData, ModuleType, SyllabusChapter, TutoringSession, TutoringSessionType, ThesisStudent } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   BookOpen, Calendar, Clock, FileText, GraduationCap, Users,
   Download, CheckCircle2, AlertTriangle, BarChart3, TrendingUp,
-  Circle, Timer, Star, Target
+  Circle, Timer, Star, Target, Cloud
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -85,6 +86,7 @@ const SESSION_TYPE_LABELS: Record<string, string> = {
 
 export function PedagogicalReports({ evaluationData, moduleName, moduleType }: PedagogicalReportsProps) {
   const [activeReport, setActiveReport] = useState<'course' | 'supervision'>('course');
+  const [driveSaving, setDriveSaving] = useState(false);
 
   const syllabus = evaluationData.syllabus;
   const chapters = useMemo(() => syllabus?.chapters ?? [], [syllabus?.chapters]);
@@ -118,10 +120,9 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
     };
   }, [evaluationData.attendance]);
 
-  const handleExportReport = async (reportType: string) => {
-    let content = '';
+  const buildReportContent = (reportType: string): string => {
     const now = new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' });
-    const defaultFileName = `Rapport_${reportType === 'course' ? 'Cours' : 'Encadrement'}_${moduleName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.txt`;
+    let content = '';
 
     if (reportType === 'course') {
       content = `RAPPORT DE SUIVI PÉDAGOGIQUE\n`;
@@ -186,9 +187,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
         for (const s of thesisStudents) {
           content += `  ${s.firstName} ${s.lastName} — ${s.status} (${s.progress}%) — ${s.title || 'Sans titre'}\n`;
           content += `    Directeur: ${s.advisor || 'N/A'} | Co-encadrant: ${s.coAdvisor || 'N/A'}\n`;
-          if (s.events.length > 0) {
-            content += `    Événements : ${s.events.length}\n`;
-          }
+          if (s.events.length > 0) content += `    Événements : ${s.events.length}\n`;
         }
       } else {
         content += `Aucun étudiant encadré enregistré.\n`;
@@ -202,13 +201,9 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
         content += `Durée moyenne : ${tutoringStats.avgDuration} min\n`;
         content += `Taux de complétion : ${tutoringStats.completionRate}%\n\n`;
         content += `PAR TYPE :\n`;
-        for (const [type, count] of Object.entries(tutoringStats.byType)) {
-          content += `  ${SESSION_TYPE_LABELS[type] || type} : ${count} séance(s)\n`;
-        }
+        for (const [type, count] of Object.entries(tutoringStats.byType)) content += `  ${SESSION_TYPE_LABELS[type] || type} : ${count} séance(s)\n`;
         content += `\nPAR ÉTUDIANT :\n`;
-        for (const [student, count] of Object.entries(tutoringStats.byStudent)) {
-          content += `  ${student} : ${count} séance(s)\n`;
-        }
+        for (const [student, count] of Object.entries(tutoringStats.byStudent)) content += `  ${student} : ${count} séance(s)\n`;
         content += `\nDÉTAIL DES SÉANCES :\n`;
         for (const s of tutoringSessions) {
           content += `  ${s.date} ${s.time} — ${s.studentName} — ${SESSION_TYPE_LABELS[s.sessionType] || s.sessionType}\n`;
@@ -220,6 +215,33 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
         content += `\nAucune séance de tutorat enregistrée.\n`;
       }
     }
+    return content;
+  };
+
+  const getReportFileName = (reportType: string) => `Rapport_${reportType === 'course' ? 'Cours' : 'Encadrement'}_${moduleName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.txt`;
+
+  const handleSaveToDrive = async (reportType: string) => {
+    if (!isDriveConnected()) {
+      alert('Veuillez d\'abord connecter votre Google Drive depuis le bouton "Drive" dans le header.');
+      return;
+    }
+    setDriveSaving(true);
+    try {
+      const content = buildReportContent(reportType);
+      const fileName = getReportFileName(reportType);
+      await uploadToDrive(fileName, content, 'text/plain');
+      alert('✅ Rapport sauvegardé dans Google Drive !\n\nFichier : ' + fileName + '\nDossier : GradeAssist/');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+      alert('❌ Erreur lors de la sauvegarde : ' + msg);
+    } finally {
+      setDriveSaving(false);
+    }
+  };
+
+  const handleExportReport = async (reportType: string) => {
+    const content = buildReportContent(reportType);
+    const defaultFileName = getReportFileName(reportType);
 
     // Download the file — the browser will open a save dialog or download directly
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
@@ -428,11 +450,15 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
             </CardContent>
           </Card>
 
-          {/* Export Button */}
-          <div className="flex justify-end">
+          {/* Export Buttons */}
+          <div className="flex justify-end gap-2">
             <Button onClick={() => handleExportReport('course')} variant="outline">
               <Download className="mr-2 h-4 w-4" />
-              Enregistrer le rapport de suivi
+              Télécharger le rapport
+            </Button>
+            <Button onClick={() => handleSaveToDrive('course')} variant="default" disabled={driveSaving} className="gap-2">
+              <Cloud className="h-4 w-4" />
+              {driveSaving ? 'Sauvegarde...' : 'Sauvegarder sur Google Drive'}
             </Button>
           </div>
         </div>
@@ -634,11 +660,15 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
             </CardContent>
           </Card>
 
-          {/* Export Button */}
-          <div className="flex justify-end">
+          {/* Export Buttons */}
+          <div className="flex justify-end gap-2">
             <Button onClick={() => handleExportReport('supervision')} variant="outline">
               <Download className="mr-2 h-4 w-4" />
-              Enregistrer le rapport d&apos;encadrement
+              Télécharger le rapport
+            </Button>
+            <Button onClick={() => handleSaveToDrive('supervision')} variant="default" disabled={driveSaving} className="gap-2">
+              <Cloud className="h-4 w-4" />
+              {driveSaving ? 'Sauvegarde...' : 'Sauvegarder sur Google Drive'}
             </Button>
           </div>
         </div>
