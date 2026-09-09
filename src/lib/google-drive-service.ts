@@ -12,9 +12,12 @@ const DRIVE_FOLDER_KEY = 'gradeAssist_gdrive_folder_id';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 
-// The client ID must be registered in Google Cloud Console
-// with Authorized JavaScript origins for all app origins
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+// The client ID is a public identifier (safe to embed in the browser bundle).
+// Default = the OAuth Web Client registered in Google Cloud Console.
+// Override with NEXT_PUBLIC_GOOGLE_CLIENT_ID if you create a new client.
+const GOOGLE_CLIENT_ID =
+  process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+  '1092387829836-ib12hdsbj33alnvkejonbh4scg33v9ui.apps.googleusercontent.com';
 
 export interface DriveTokenData {
   accessToken: string;
