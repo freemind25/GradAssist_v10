@@ -87,11 +87,11 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
   const [activeReport, setActiveReport] = useState<'course' | 'supervision'>('course');
 
   const syllabus = evaluationData.syllabus;
-  const chapters = syllabus?.chapters ?? [];
+  const chapters = useMemo(() => syllabus?.chapters ?? [], [syllabus?.chapters]);
   const progress = useMemo(() => computeSyllabusProgress(chapters), [chapters]);
-  const tutoringSessions = evaluationData.tutoringSessions ?? [];
+  const tutoringSessions = useMemo(() => evaluationData.tutoringSessions ?? [], [evaluationData.tutoringSessions]);
   const tutoringStats = useMemo(() => computeTutoringStats(tutoringSessions), [tutoringSessions]);
-  const thesisStudents = evaluationData.thesisStudents ?? [];
+  const thesisStudents = useMemo(() => evaluationData.thesisStudents ?? [], [evaluationData.thesisStudents]);
   const supervisionStats = useMemo(() => computeSupervisionStats(thesisStudents), [thesisStudents]);
 
   // ─── Attendance stats ───
@@ -221,35 +221,15 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
       }
     }
 
-    // Try File System Access API (PC/desktop) for native save-as dialog
-    if ('showSaveFilePicker' in window) {
-      try {
-        const handle = await (window as any).showSaveFilePicker({
-          suggestedName: defaultFileName,
-          types: [
-            {
-              description: 'Fichier texte',
-              accept: { 'text/plain': ['.txt'] },
-            },
-          ],
-        });
-        const writable = await handle.createWritable();
-        await writable.write(new Blob([content], { type: 'text/plain;charset=utf-8' }));
-        await writable.close();
-        return;
-      } catch (err: any) {
-        // User cancelled the dialog — do nothing
-        if (err?.name === 'AbortError') return;
-      }
-    }
-
-    // Fallback: auto-download (mobile, Electron, browsers without API)
+    // Download the file — the browser will open a save dialog or download directly
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = defaultFileName;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
