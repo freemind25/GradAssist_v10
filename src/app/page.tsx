@@ -501,23 +501,11 @@ export default function GradeAssistPage() {
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
                     Grade<span className="text-accent">Assist</span>
                   </h1>
-                  <p className="text-xs text-white/60 font-medium mt-0.5">Gestion Pédagogique Universitaire</p>
+                  <p className="text-xs text-white/60 font-medium mt-0.5">Gestion Pédagogique Universitaire · Designed by M.SADI</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <HelpGuideDialog />
-
-                {/* Teacher profile badge */}
-                {teacher && (
-                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/10 border border-white/15" title={`${teacher.name} — ${teacher.email}`}>
-                    <div className="w-5 h-5 rounded-full bg-accent/30 flex items-center justify-center text-[10px] font-bold text-white">
-                      {teacher.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-                    </div>
-                    <span className="text-xs text-white/70 hidden sm:inline max-w-[100px] truncate">
-                      {teacher.name.split(' ')[0]}
-                    </span>
-                  </div>
-                )}
 
                 <Menubar className="bg-white/10 border-white/15 text-white hover:bg-white/15">
                   <MenubarMenu>
