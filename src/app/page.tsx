@@ -501,7 +501,7 @@ export default function GradeAssistPage() {
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
                     Grade<span className="text-accent">Assist</span>
                   </h1>
-                  <p className="text-xs text-white/60 font-medium mt-0.5">Gestion Pédagogique Universitaire · Designed by M.SADI</p>
+                  <p className="text-xs text-white/60 font-medium mt-0.5">Gestion Pédagogique Universitaire</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
