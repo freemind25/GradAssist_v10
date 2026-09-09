@@ -17,7 +17,7 @@ const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 // Override with NEXT_PUBLIC_GOOGLE_CLIENT_ID if you create a new client.
 const GOOGLE_CLIENT_ID =
   process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-  '1092387829836-ib12hdsbj33alnvkejonbh4scg33v9ui.apps.googleusercontent.com';
+  '1088043365323-6n4ke2fp5fofed19vjje7gm097lsvbj7.apps.googleusercontent.com';
 
 export interface DriveTokenData {
   accessToken: string;
