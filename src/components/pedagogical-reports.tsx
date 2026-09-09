@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { EvaluationData, ModuleType, SyllabusChapter, TutoringSession, TutoringSessionType, ThesisStudent } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -118,9 +118,10 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
     };
   }, [evaluationData.attendance]);
 
-  const handleExportReport = (reportType: string) => {
+  const handleExportReport = useCallback(async (reportType: string) => {
     let content = '';
     const now = new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' });
+    const defaultFileName = `Rapport_${reportType === 'course' ? 'Cours' : 'Encadrement'}_${moduleName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.txt`;
 
     if (reportType === 'course') {
       content = `RAPPORT DE SUIVI PÉDAGOGIQUE\n`;
@@ -220,15 +221,37 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
       }
     }
 
-    // Download as text file
+    // Try File System Access API (PC/desktop) for native save-as dialog
+    if ('showSaveFilePicker' in window) {
+      try {
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: defaultFileName,
+          types: [
+            {
+              description: 'Fichier texte',
+              accept: { 'text/plain': ['.txt'] },
+            },
+          ],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(new Blob([content], { type: 'text/plain;charset=utf-8' }));
+        await writable.close();
+        return;
+      } catch (err: any) {
+        // User cancelled the dialog — do nothing
+        if (err?.name === 'AbortError') return;
+      }
+    }
+
+    // Fallback: auto-download (mobile, Electron, browsers without API)
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Rapport_${reportType === 'course' ? 'Cours' : 'Encadrement'}_${moduleName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = defaultFileName;
     a.click();
     URL.revokeObjectURL(url);
-  };
+  }, [moduleName, moduleType, evaluationData, progress, attendanceStats, chapters, thesisStudents, tutoringSessions]);
 
   return (
     <div className="space-y-6">
@@ -429,7 +452,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
           <div className="flex justify-end">
             <Button onClick={() => handleExportReport('course')} variant="outline">
               <Download className="mr-2 h-4 w-4" />
-              Exporter le rapport de suivi
+              Enregistrer le rapport de suivi
             </Button>
           </div>
         </div>
@@ -635,7 +658,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
           <div className="flex justify-end">
             <Button onClick={() => handleExportReport('supervision')} variant="outline">
               <Download className="mr-2 h-4 w-4" />
-              Exporter le rapport d&apos;encadrement
+              Enregistrer le rapport d&apos;encadrement
             </Button>
           </div>
         </div>
