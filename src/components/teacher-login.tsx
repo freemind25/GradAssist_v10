@@ -59,7 +59,8 @@ export function TeacherLogin({ onLogin }: TeacherLoginProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[hsl(var(--background))] to-[hsl(var(--muted))]/30 p-4">
+    <div className="min-h-screen flex flex-col">
+    <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-[hsl(var(--background))] to-[hsl(var(--muted))]/30 p-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
@@ -71,7 +72,7 @@ export function TeacherLogin({ onLogin }: TeacherLoginProps) {
           <h1 className="text-2xl font-extrabold tracking-tight">
             Grade<span className="text-accent">Assist</span>
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">Application d&apos;Évaluation Modulaire</p>
+          <p className="text-sm text-muted-foreground mt-1">Gestion Pédagogique Universitaire</p>
         </div>
 
         {/* Login Card */}
@@ -79,7 +80,7 @@ export function TeacherLogin({ onLogin }: TeacherLoginProps) {
           <div className="text-center">
             <h2 className="text-lg font-semibold">Identification de l&apos;enseignant</h2>
             <p className="text-xs text-muted-foreground mt-1">
-              Entrez vos informations pour synchroniser vos données dans le cloud.
+              Facultatif — personnalise l&apos;en-tête de vos documents et rapports.
             </p>
           </div>
 
@@ -127,7 +128,7 @@ export function TeacherLogin({ onLogin }: TeacherLoginProps) {
               />
             </div>
 
-            <button
+          <button
               type="submit"
               className={cn(
                 "w-full py-2.5 rounded-lg text-sm font-semibold transition-all",
@@ -141,12 +142,38 @@ export function TeacherLogin({ onLogin }: TeacherLoginProps) {
             </button>
           </form>
 
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() =>
+                onLogin({
+                  name: "Enseignant",
+                  email: "local@gradeassist.app",
+                  department: "",
+                  loggedAt: new Date().toISOString(),
+                })
+              }
+              className="w-full py-2 rounded-lg text-sm text-muted-foreground hover:text-accent border border-transparent hover:border-accent/40 transition-all underline-offset-4 hover:underline"
+            >
+              Continuer sans identification →
+            </button>
+          </div>
+
           <p className="text-[10px] text-center text-muted-foreground">
-            Vos données sont synchronisées automatiquement dans le cloud institutionnel.
-            <br />Chaque enseignant a son propre espace de données.
+            L&apos;identification est facultative : elle personnalise vos rapports.
+            <br />Toutes vos données restent enregistrées localement sur votre appareil.
           </p>
         </div>
       </div>
+    </div>
+      <footer className="border-t py-6 text-center text-xs text-muted-foreground">
+        <p>&copy; {new Date().getFullYear()} GradeAssist. Tous droits réservés.</p>
+        <p className="mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+          <a href="/confidentialite" className="hover:text-accent underline underline-offset-4">Politique de confidentialité</a>
+          <span aria-hidden="true">·</span>
+          <a href="/conditions" className="hover:text-accent underline underline-offset-4">Conditions d&apos;utilisation</a>
+        </p>
+      </footer>
     </div>
   );
 }
