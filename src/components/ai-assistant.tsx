@@ -288,6 +288,18 @@ Utilise ce contexte pour donner des réponses pertinentes et personnalisées. Si
           }),
         });
 
+        if (res.status === 401 || res.status === 403) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: "❌ Clé Mistral non valide ou compte non autorisé pour ce modèle. Vérifiez votre clé dans ⚙️ Informations Générales.",
+            },
+          ]);
+          setIsLoading(false);
+          return;
+        }
+
         const data = await res.json();
         if (data.error) {
           setMessages((prev) => [...prev, { role: "assistant", content: `❌ ${data.error}` }]);
