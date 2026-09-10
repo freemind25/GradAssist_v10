@@ -3,6 +3,7 @@
 import type * as React from 'react';
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { BookCopy, Plus, FolderPlus, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DEFAULT_CRITERIA, TARGET_SUM_COEFFICIENTS } from "@/config/grading-config";
 import type { EvaluationData, EvaluationModule as EvaluationModuleType, ModuleType } from "@/types";
@@ -622,6 +623,10 @@ export default function GradeAssistPage() {
             <footer className="text-center text-sm text-muted-foreground py-8 border-t">
                 <p>&copy; {new Date().getFullYear()} GradeAssist. Tous droits réservés.</p>
                 <p className="mt-1">Données sauvegardées localement. {modules.length} module(s) au total.</p>
+                <p className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+                    <Link href="/confidentialite" className="hover:text-accent underline-offset-4 hover:underline">Politique de confidentialité</Link>
+                    <Link href="/conditions" className="hover:text-accent underline-offset-4 hover:underline">Conditions d&apos;utilisation</Link>
+                </p>
             </footer>
         </div>
     </div>
