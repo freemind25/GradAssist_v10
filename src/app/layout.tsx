@@ -43,6 +43,7 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <head>
+        <meta name="google-site-verification" content="google2114237d9f343bbc" />
         <link rel="icon" href="/icon-192.svg" sizes="192x192" />
         <link rel="apple-touch-icon" href="/icon-192.svg" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
