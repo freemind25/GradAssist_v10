@@ -1,62 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
+import {
+  hashPassword,
+  verifyPassword,
+  generateToken,
+  verifyToken,
+  getTokenFromCookies,
+  COOKIE_NAME,
+  getSessionCookieOptions,
+  type JwtPayload,
+} from "@/lib/auth";
+import {
+  createUser,
+  getUserByEmail,
+  getUserById,
+  emailExists,
+  initializeDatabase,
+} from "@/lib/db";
 
 /**
- * [SEC-04b] Route API pour l'authentification enseignant.
+ * [SEC-04b/c] Route API d'authentification — Neon PostgreSQL + bcrypt + JWT.
  *
- * Implémentation simplifiée et stable (alternative à NextAuth v5 beta).
- * Utilise Supabase Auth directement via @supabase/ssr :
- *   - POST /api/auth/login → signInWithPassword
- *   - POST /api/auth/signup → signUp
- *   - POST /api/auth/logout → signOut
- *   - GET  /api/auth/session → getSession
+ * POST /api/auth { action: "login" | "signup" | "logout", ... }
+ * GET  /api/auth → renvoie la session actuelle (depuis cookie JWT)
  *
- * Avantages vs NextAuth v5 beta :
- *   - Pas de dépendance beta instable (RSK-2 mitigé)
- *   - API Supabase Auth plus simple que configuration NextAuth
- *   - Moins de code, moins de surface d'attaque
- *   - Cookies gérés par @supabase/ssr (httpOnly, secure, sameSite=lax)
- *
- * Inconvénients :
- *   - Pas de providers OAuth multiples (Google, GitHub, etc.) — non requis pour P1
- *   - Pas de gestion de session JWT stateless — mais Supabase gère les refresh tokens
- *
- * Action : GET  → renvoie la session actuelle
- * Action : POST → login/signup/logout selon le champ `action` du body
+ * Le JWT est stocké en cookie httpOnly (jamais accessible au JS client).
  */
 
-export async function GET(request: NextRequest) {
+function generateUserId(): string {
+  return `user_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export async function GET() {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { session }, error } = await supabase.auth.getSession();
+    const cookieStore = await cookies();
+    const token = getTokenFromCookies(
+      cookieStore.get("cookie")?.value ??
+        cookieStore.toString()
+    ) ?? cookieStore.get(COOKIE_NAME)?.value ?? null;
 
-    if (error) {
-      return NextResponse.json({ user: null }, { status: 200 });
+    const payload = verifyToken(token);
+    if (!payload) {
+      return NextResponse.json({ user: null });
     }
-
-    if (!session) {
-      return NextResponse.json({ user: null }, { status: 200 });
-    }
-
-    // Récupérer le profil depuis la table profiles
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", session.user.id)
-      .single();
 
     return NextResponse.json({
       user: {
-        id: session.user.id,
-        email: session.user.email,
-        fullName: profile?.full_name,
-        department: profile?.department,
-        role: profile?.role ?? "teacher",
+        id: payload.userId,
+        email: payload.email,
+        fullName: payload.fullName,
+        department: payload.department,
+        role: payload.role,
       },
     });
-  } catch (err) {
-    console.error("[/api/auth/session] Erreur:", err);
-    return NextResponse.json({ user: null }, { status: 200 });
+  } catch {
+    return NextResponse.json({ user: null });
   }
 }
 
@@ -64,8 +62,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action } = body;
-
-    const supabase = await createSupabaseServerClient();
 
     if (action === "login") {
       // --- LOGIN ---
@@ -77,38 +73,57 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        console.warn(`[/api/auth/login] Échec login pour ${email}: ${error.message}`);
+      const user = await getUserByEmail(email);
+      if (!user) {
         return NextResponse.json(
           { error: "Email ou mot de passe incorrect." },
           { status: 401 }
         );
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", data.user.id)
-        .single();
+      const passwordValid = await verifyPassword(password, user.password_hash);
+      if (!passwordValid) {
+        return NextResponse.json(
+          { error: "Email ou mot de passe incorrect." },
+          { status: 401 }
+        );
+      }
 
-      return NextResponse.json({
+      // Générer JWT
+      const payload: JwtPayload = {
+        userId: user.id,
+        email: user.email,
+        fullName: user.full_name,
+        department: user.department,
+        role: user.role as "teacher" | "admin" | "guest",
+      };
+      const token = generateToken(payload);
+
+      // Poser cookie httpOnly
+      const cookieOpts = getSessionCookieOptions();
+      const response = NextResponse.json({
         user: {
-          id: data.user.id,
-          email: data.user.email,
-          fullName: profile?.full_name,
-          department: profile?.department,
-          role: profile?.role ?? "teacher",
+          id: user.id,
+          email: user.email,
+          fullName: user.full_name,
+          department: user.department,
+          role: user.role,
         },
       });
+      response.cookies.set({
+        name: cookieOpts.name,
+        value: token,
+        httpOnly: cookieOpts.httpOnly,
+        secure: cookieOpts.secure,
+        sameSite: cookieOpts.sameSite,
+        path: cookieOpts.path,
+        maxAge: cookieOpts.maxAge,
+      });
+      return response;
     }
 
     if (action === "signup") {
-      // --- SIGNUP (voie 3 — migration douce) ---
+      // --- SIGNUP ---
       const { email, password, fullName, department } = body;
       if (!email || !password || !fullName) {
         return NextResponse.json(
@@ -116,7 +131,6 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      // Validation password strength (min 8 char)
       if (password.length < 8) {
         return NextResponse.json(
           { error: "Le mot de passe doit contenir au moins 8 caractères." },
@@ -124,47 +138,72 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            department: department ?? null,
-          },
-        },
-      });
-
-      if (error) {
-        console.warn(`[/api/auth/signup] Échec signup pour ${email}: ${error.message}`);
+      // Vérifier email non déjà utilisé
+      const exists = await emailExists(email);
+      if (exists) {
         return NextResponse.json(
-          { error: "Inscription impossible. Email peut-être déjà utilisé." },
-          { status: 400 }
+          { error: "Cet email est déjà utilisé. Connectez-vous." },
+          { status: 409 }
         );
       }
 
-      // La création du profil `profiles` est gérée par un trigger Supabase
-      // (auto-création à l'inscription) — à configurer dans le dashboard Supabase.
+      // Initialiser la table users si pas déjà fait
+      try {
+        await initializeDatabase();
+      } catch {
+        // La table existe probablement déjà — ignorer
+      }
 
-      return NextResponse.json({
+      // Hacher le mot de passe
+      const passwordHash = await hashPassword(password);
+      const userId = generateUserId();
+
+      const user = await createUser(userId, email, passwordHash, fullName, department || null);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Inscription impossible. Réessayez." },
+          { status: 500 }
+        );
+      }
+
+      // Générer JWT immédiatement (auto-login après signup)
+      const payload: JwtPayload = {
+        userId: user.id,
+        email: user.email,
+        fullName: user.full_name,
+        department: user.department,
+        role: user.role as "teacher" | "admin" | "guest",
+      };
+      const token = generateToken(payload);
+
+      const cookieOpts = getSessionCookieOptions();
+      const response = NextResponse.json({
         user: {
-          id: data.user?.id,
-          email: data.user?.email,
-          fullName,
-          department,
-          role: "teacher",
+          id: user.id,
+          email: user.email,
+          fullName: user.full_name,
+          department: user.department,
+          role: user.role,
         },
-        message: "Compte créé. Vérifiez votre email pour confirmer l'inscription.",
+        message: "Compte créé avec succès.",
       });
+      response.cookies.set({
+        name: cookieOpts.name,
+        value: token,
+        httpOnly: cookieOpts.httpOnly,
+        secure: cookieOpts.secure,
+        sameSite: cookieOpts.sameSite,
+        path: cookieOpts.path,
+        maxAge: cookieOpts.maxAge,
+      });
+      return response;
     }
 
     if (action === "logout") {
       // --- LOGOUT ---
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error("[/api/auth/logout] Erreur:", error.message);
-      }
-      return NextResponse.json({ success: true });
+      const response = NextResponse.json({ success: true });
+      response.cookies.delete(COOKIE_NAME);
+      return response;
     }
 
     return NextResponse.json(
