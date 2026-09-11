@@ -165,6 +165,21 @@ export async function initializeDatabase() {
   await sql`CREATE INDEX IF NOT EXISTS idx_events_evaluation_id ON supervision_events(evaluation_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_chapters_evaluation_id ON syllabus_chapters(evaluation_id)`;
 
+  // [SEC-04a] Table des utilisateurs (authentification Neon + bcrypt + JWT)
+  await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      full_name TEXT NOT NULL,
+      department TEXT,
+      role TEXT NOT NULL DEFAULT 'teacher' CHECK (role IN ('teacher', 'admin', 'guest')),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`;
+
   console.log('✅ Base de données initialisée avec succès');
 }
 
@@ -287,4 +302,68 @@ export async function getAttendance(evaluationId: string) {
     SELECT * FROM attendance WHERE evaluation_id = ${evaluationId} ORDER BY attendance_date
   `;
   return result;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  AUTHENTIFICATION (Neon + bcrypt + JWT)
+// ══════════════════════════════════════════════════════════════
+
+export interface UserRecord {
+  id: string;
+  email: string;
+  password_hash: string;
+  full_name: string;
+  department: string | null;
+  role: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Crée un nouvel utilisateur dans la table users.
+ */
+export async function createUser(
+  id: string,
+  email: string,
+  passwordHash: string,
+  fullName: string,
+  department: string | null
+): Promise<UserRecord | null> {
+  const result = await sql`
+    INSERT INTO users (id, email, password_hash, full_name, department, role)
+    VALUES (${id}, ${email}, ${passwordHash}, ${fullName}, ${department}, 'teacher')
+    ON CONFLICT (email) DO NOTHING
+    RETURNING *
+  `;
+  return result[0] || null;
+}
+
+/**
+ * Récupère un utilisateur par son email (pour login).
+ */
+export async function getUserByEmail(email: string): Promise<UserRecord | null> {
+  const result = await sql`
+    SELECT * FROM users WHERE email = ${email} LIMIT 1
+  `;
+  return result[0] || null;
+}
+
+/**
+ * Récupère un utilisateur par son ID (pour vérifier la session JWT).
+ */
+export async function getUserById(id: string): Promise<UserRecord | null> {
+  const result = await sql`
+    SELECT * FROM users WHERE id = ${id} LIMIT 1
+  `;
+  return result[0] || null;
+}
+
+/**
+ * Vérifie si un email est déjà utilisé.
+ */
+export async function emailExists(email: string): Promise<boolean> {
+  const result = await sql`
+    SELECT 1 FROM users WHERE email = ${email} LIMIT 1
+  `;
+  return result.length > 0;
 }
