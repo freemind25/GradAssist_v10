@@ -288,13 +288,22 @@ Utilise ce contexte pour donner des réponses pertinentes et personnalisées. Si
           }),
         });
 
-        if (res.status === 401 || res.status === 403) {
+        if (!res.ok) {
+          let errorMsg = `Erreur serveur (${res.status}).`;
+          try {
+            const errData = await res.json();
+            errorMsg = errData.error || errorMsg;
+          } catch {
+            // non-JSON response
+          }
+          if (res.status === 401 || res.status === 403) {
+            errorMsg = "Clé Mistral non valide ou compte non autorisé pour ce modèle. Vérifiez votre clé dans ⚙️ Informations Générales.";
+          } else if (res.status === 502 || res.status === 503 || res.status === 504) {
+            errorMsg = "Le serveur est temporairement indisponible. Réessayez dans quelques secondes.";
+          }
           setMessages((prev) => [
             ...prev,
-            {
-              role: "assistant",
-              content: "❌ Clé Mistral non valide ou compte non autorisé pour ce modèle. Vérifiez votre clé dans ⚙️ Informations Générales.",
-            },
+            { role: "assistant", content: `❌ ${errorMsg}` },
           ]);
           setIsLoading(false);
           return;
@@ -306,10 +315,11 @@ Utilise ce contexte pour donner des réponses pertinentes et personnalisées. Si
         } else {
           setMessages((prev) => [...prev, { role: "assistant", content: data.content }]);
         }
-      } catch {
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: "❌ Erreur de connexion. Vérifiez votre connexion internet." },
+          { role: "assistant", content: `❌ Impossible de contacter l'assistant IA. ${msg.includes('fetch') ? 'Vérifiez votre connexion internet.' : msg}` },
         ]);
       } finally {
         setIsLoading(false);
