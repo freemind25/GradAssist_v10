@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const SRC = path.join(__dirname, '..', 'out');
+const SRC = path.join(__dirname, '..', '.next', 'standalone');
 const DEST = path.join(__dirname, '..', 'electron', 'standalone');
 
 function copyDirSync(src, dest) {
