@@ -65,14 +65,18 @@ function generateNonce(): string {
 function buildCspHeader(nonce: string): string {
   const csp = [
     `default-src 'self'`,
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    // Google Identity Services (gsi/client) + 'unsafe-eval' requis par Google OAuth popup
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://accounts.google.com`,
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     `font-src 'self' https://fonts.gstatic.com data:`,
-    `img-src 'self' data: blob:`,
-    `connect-src 'self' https://api.mistral.ai https://www.googleapis.com`,
+    `img-src 'self' data: blob: https:`,  // logos universités peuvent être https
+    // Google Drive API + OAuth userinfo + Mistral
+    `connect-src 'self' https://api.mistral.ai https://www.googleapis.com https://oauth2.googleapis.com`,
+    // Google OAuth peut ouvrir des popups/frame pour le consentement
+    `frame-src 'self' https://accounts.google.com`,
     `frame-ancestors 'none'`,
     `base-uri 'self'`,
-    `form-action 'self'`,
+    `form-action 'self' https://accounts.google.com`,
   ];
   return csp.join("; ");
 }
