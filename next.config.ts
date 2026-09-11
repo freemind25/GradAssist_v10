@@ -1,33 +1,65 @@
 import type { NextConfig } from 'next';
 
+// [SEC-05] Désactivé : un SVG peut contenir du JS inline exécutable dans le contexte
+// de l'app. Les logos universitaires doivent être convertis en PNG côté client avant
+// upload, ou stockés en base64 PNG.
+// [SEC-06] ESLint désormais bloquant en build de production (règles de sécurité incluses).
+// [SEC-09] En-têtes de sécurité HTTP gérés dans middleware.ts (CSP avec nonce dynamique).
+// Le middleware est obligatoire car la CSP nécessite un nonce régénéré à chaque requête.
+
 const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
   eslint: {
-    // ESLint géré séparément — ne bloque pas le build de production
-    ignoreDuringBuilds: true,
+    // [SEC-06] ESLint doit bloquer le build de production
+    // (règles de sécurité @typescript-eslint/strict, eslint-plugin-security)
+    ignoreDuringBuilds: false,
   },
   images: {
     unoptimized: true,
-    dangerouslyAllowSVG: true,
+    // [SEC-05] SVG interdit — risque XSS via <script> inline, onload, foreignObject
+    dangerouslyAllowSVG: false,
     contentDispositionType: 'attachment',
-    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
-    remotePatterns: [
+  },
+  // [SEC-09] Headers de sécurité définis dans middleware.ts (nonce dynamique requis).
+  // La fonction headers() next.config est conservée pour fallback si middleware désactivé.
+  async headers() {
+    return [
       {
-        protocol: 'https',
-        hostname: 'picsum.photos',
-        port: '',
-        pathname: '/**',
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()',
+          },
+          // CSP sans nonce (fallback) — le middleware ajoutera le nonce sur les pages dynamiques
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "font-src 'self' https://fonts.gstatic.com data:",
+              "img-src 'self' data: blob:",
+              "connect-src 'self' https://api.mistral.ai https://www.googleapis.com",
+              "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+            ].join('; '),
+          },
+        ],
       },
-      {
-        protocol: 'https',
-        hostname: 'latex.codecogs.com',
-        port: '',
-        pathname: '/**',
-      },
-    ],
+    ];
   },
 };
 
 export default nextConfig;
+
