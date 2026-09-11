@@ -92,25 +92,49 @@ const downloadFile = (content: string, filename: string): void => {
   document.body.removeChild(link);
 };
 
+// [SEC-03] Sanitizer anti-formula injection CSV/Excel.
+// Un attaquant peut saisir un nom d'étudiant commençant par =, +, -, @, TAB
+// pour exécuter une formule malveillante à l'ouverture du fichier dans Excel.
+// Référence : OWASP Formula Injection Cheat Sheet.
+// Préfixe par apostrophe force le mode texte (les lecteurs CSV l'interprètent
+// comme un échappement et n'affichent que le contenu, pas l'apostrophe).
+const CSV_FORMULA_PREFIXES = /^[=+\-@\t\r]/;
+
+function sanitizeCsvCell(value: string | undefined | null): string {
+  if (!value) return "";
+  const trimmed = String(value);
+  // Double les guillemets internes (RFC 4180)
+  const escaped = trimmed.replace(/"/g, '""');
+  // Préfixe par apostrophe si la valeur commence par un caractère de formule
+  if (CSV_FORMULA_PREFIXES.test(trimmed)) {
+    return `'${escaped}`;
+  }
+  return escaped;
+}
+
+function csvCell(value: string | undefined | null): string {
+  return `"${sanitizeCsvCell(value)}"`;
+}
+
 export const exportIndividualCSV = (params: ExportIndividualParams): void => {
   const { criteria, selectedGrades, studentNames, teacherNames, projectName, studyLevel, studySubLevel, session, academicYear, universityName, establishmentName, departmentName, masterSpecialty, universityLogo, totalPoints, maxTotalPoints, evaluationSheetTitleComplement } = params;
 
-  let csv = `data:text/csv;charset=utf-8,${getDocumentTitle(evaluationSheetTitleComplement)}\n`;
+  let csv = `data:text/csv;charset=utf-8,${sanitizeCsvCell(getDocumentTitle(evaluationSheetTitleComplement))}\n`;
   if (universityLogo) csv += "Logo Université:,(Logo fourni)\n";
-  csv += `Université:,"${universityName || 'N/A'}"\nÉtablissement:,"${establishmentName || 'N/A'}"\nDépartement:,"${departmentName || 'N/A'}"\n`;
-  csv += `Niveau d'étude:,"${studyLevel ? `${studyLevel} - ${studySubLevel}` : 'N/A'}"\n`;
-  if (studyLevel === "Master") csv += `Spécialité Master:,"${masterSpecialty || 'N/A'}"\n`;
-  
-  csv += `Nom de l'étudiant(e/s):,"${studentNames.filter(n => n.trim()).join(', ') || 'N/A'}"\n`;
-  csv += `Nom de l'enseignant(e/s):,"${teacherNames.filter(n => n.trim()).join(', ') || 'N/A'}"\n`;
-  csv += `Intitulé du Projet:,"${projectName || 'N/A'}"\nSession:,"${session || 'N/A'}"\nAnnée Universitaire:,"${academicYear || 'N/A'}"\n\n`;
+  csv += `Université:,${csvCell(universityName)}\nÉtablissement:,${csvCell(establishmentName)}\nDépartement:,${csvCell(departmentName)}\n`;
+  csv += `Niveau d'étude:,${csvCell(studyLevel ? `${studyLevel} - ${studySubLevel}` : 'N/A')}\n`;
+  if (studyLevel === "Master") csv += `Spécialité Master:,${csvCell(masterSpecialty)}\n`;
+
+  csv += `Nom de l'étudiant(e/s):,${csvCell(studentNames.filter(n => n.trim()).join(', '))}\n`;
+  csv += `Nom de l'enseignant(e/s):,${csvCell(teacherNames.filter(n => n.trim()).join(', '))}\n`;
+  csv += `Intitulé du Projet:,${csvCell(projectName)}\nSession:,${csvCell(session)}\nAnnée Universitaire:,${csvCell(academicYear)}\n\n`;
   csv += "Critère,Coefficient,Note Attribuée,Points Obtenus\n";
 
   criteria.forEach(c => {
     const grade = selectedGrades[c.id];
     const displayGrade = (grade && grade !== NON_NOTE_VALUE && c.coefficient > 0) ? grade : "N/A";
     const points = c.coefficient > 0 ? getPointsForSelectedGrade(grade) : 0;
-    csv += `"${c.name}",${c.coefficient},${displayGrade},${points.toFixed(2)}\n`;
+    csv += `${csvCell(c.name)},${c.coefficient},${csvCell(displayGrade)},${points.toFixed(2)}\n`;
   });
 
   csv += `\nTotal des Points,""," ",${totalPoints.toFixed(2)}\nSur,""," ",${maxTotalPoints.toFixed(2)}\n`;
@@ -127,18 +151,30 @@ export const exportSummaryCSV = (params: ExportSummaryParams): void => {
   }
 
   const first = allEvaluations[0];
-  let csv = `data:text/csv;charset=utf-8,Synthèse des Évaluations - ${moduleName}\n`;
+  let csv = `data:text/csv;charset=utf-8,Synthèse des Évaluations - ${sanitizeCsvCell(moduleName)}\n`;
   if (first.evaluationSheetTitleComplement && first.evaluationSheetTitleComplement !== "...............................................................") {
-    csv += `Contexte:,"${first.evaluationSheetTitleComplement}"\n`;
+    csv += `Contexte:,${csvCell(first.evaluationSheetTitleComplement)}\n`;
   }
-  csv += `Université:,"${first.universityName || 'N/A'}"\nÉtablissement:,"${first.establishmentName || 'N/A'}"\nDépartement:,"${first.departmentName || 'N/A'}"\n\n`;
+  csv += `Université:,${csvCell(first.universityName)}\nÉtablissement:,${csvCell(first.establishmentName)}\nDépartement:,${csvCell(first.departmentName)}\n\n`;
   csv += "N°,Nom de l'étudiant(e/s),Nom de l'enseignant(e/s),Intitulé du Projet,Niveau d'étude,Spécialité Master,Session,Année Universitaire,Note Finale,Sur\n";
 
   allEvaluations.forEach((e, i) => {
-    const students = e.studentNames.filter(n => n.trim()).join(' & ') || 'N/A';
-    const teachers = e.teacherNames.filter(n => n.trim()).join(' & ') || 'N/A';
-    const level = e.studyLevel ? `${e.studyLevel} - ${e.studySubLevel}` : 'N/A';
-    csv += `${i + 1},"${students}","${teachers}","${e.projectName || 'N/A'}","${level}","${e.masterSpecialty || 'N/A'}","${e.session || 'N/A'}","${e.academicYear || 'N/A'}",${e.totalPoints.toFixed(2)},${maxTotalPoints.toFixed(2)}\n`;
+    const students = e.studentNames.filter(n => n.trim()).join(' & ');
+    const teachers = e.teacherNames.filter(n => n.trim()).join(' & ');
+    const level = e.studyLevel ? `${e.studyLevel} - ${e.studySubLevel}` : '';
+    // [SEC-03] Toutes les cellules utilisateur passent par csvCell()
+    csv += [
+      i + 1,
+      csvCell(students),
+      csvCell(teachers),
+      csvCell(e.projectName),
+      csvCell(level),
+      csvCell(e.masterSpecialty),
+      csvCell(e.session),
+      csvCell(e.academicYear),
+      e.totalPoints.toFixed(2),
+      maxTotalPoints.toFixed(2),
+    ].join(',') + '\n';
   });
 
   downloadFile(csv, `${generateSummaryFileNameBase(moduleName)}.csv`);

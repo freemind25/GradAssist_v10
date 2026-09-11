@@ -191,23 +191,35 @@ export function StudentProjectInfoForm({
     logoInputRef.current?.click();
   };
 
-  const handleLogoFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
+      // [SEC-08] Validation stricte : magic bytes + rejet SVG + taille 500 Ko max
+      const { validateImageFile, fileToDataUrl } = await import("@/lib/file-validation");
+      const result = await validateImageFile(file);
+      if (!result.valid) {
         toast({
           variant: "destructive",
-          title: "Fichier trop volumineux",
-          description: "Veuillez sélectionner un logo de moins de 2MB.",
+          title: "Fichier refusé",
+          description: result.error,
         });
+        if (logoInputRef.current) logoInputRef.current.value = "";
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setUniversityLogo(reader.result as string);
-        toast({ title: "Logo importé", description: "Le logo a été chargé." });
-      };
-      reader.readAsDataURL(file);
+      try {
+        const dataUrl = await fileToDataUrl(file);
+        setUniversityLogo(dataUrl);
+        toast({
+          title: "Logo importé",
+          description: `Le logo a été chargé (format ${result.format?.toUpperCase()}, ${(file.size / 1024).toFixed(0)} Ko).`,
+        });
+      } catch (err) {
+        toast({
+          variant: "destructive",
+          title: "Erreur de lecture",
+          description: "Impossible de lire le fichier sélectionné.",
+        });
+      }
     }
     if (logoInputRef.current) logoInputRef.current.value = "";
   };
@@ -266,7 +278,7 @@ export function StudentProjectInfoForm({
                     type="file"
                     ref={logoInputRef}
                     onChange={handleLogoFileChange}
-                    accept="image/png, image/jpeg, image/svg+xml"
+                    accept="image/png, image/jpeg, image/gif"
                     style={{ display: 'none' }}
                 />
                 {universityLogo && (
@@ -487,13 +499,20 @@ export function StudentProjectInfoForm({
               onChange={(e) => {
                 localStorage.setItem('gradeAssist_mistralApiKey', e.target.value);
               }}
-              placeholder="Collez votre clé API Mistral ici"
+              placeholder="Collez votre clé API Mistral ici (optionnel)"
               className="pl-9"
             />
             <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Clé API pour activer l&apos;assistant IA (Mistral AI). Obtenez-la sur console.mistral.ai
+            Clé API personnelle pour activer l&apos;assistant IA (Mistral AI). Obtenez-la sur{" "}
+            <a href="https://console.mistral.ai" target="_blank" rel="noopener noreferrer" className="text-accent underline">
+              console.mistral.ai
+            </a>.
+            <br />
+            <span className="text-muted-foreground/70">
+              Si vous n&apos;en configurez pas, l&apos;administrateur peut fournir une clé serveur partagée (MISTRAL_API_KEY).
+            </span>
           </p>
         </div>
 

@@ -234,19 +234,12 @@ export function AiAssistant({ evaluationData, moduleName, moduleType }: AiAssist
     async (userMessage: string) => {
       if (!userMessage.trim() || isLoading) return;
 
-      const apiKey = localStorage.getItem("gradeAssist_mistralApiKey");
-      if (!apiKey) {
-        setMessages((prev) => [
-          ...prev,
-          { role: "user", content: userMessage },
-          {
-            role: "assistant",
-            content:
-              "⚠️ Clé API Mistral non configurée. Allez dans l'onglet ⚙️ Informations Générales et entrez votre clé API Mistral AI.",
-          },
-        ]);
-        return;
-      }
+      // [SEC-01] Approche hybride :
+      // - Si l'utilisateur a configuré sa propre clé Mistral → on l'envoie dans le body
+      // - Si pas de clé utilisateur → la route /api/mistral utilise la clé serveur (env var)
+      const apiKey = typeof window !== "undefined"
+        ? localStorage.getItem("gradeAssist_mistralApiKey")
+        : null;
 
       const userMsg: ChatMessage = { role: "user", content: userMessage };
       setMessages((prev) => [...prev, userMsg]);
@@ -284,7 +277,8 @@ Utilise ce contexte pour donner des réponses pertinentes et personnalisées. Si
               ...messages.map((m) => ({ role: m.role, content: m.content })),
               { role: "user", content: userMessage },
             ],
-            apiKey,
+            // [SEC-01] Envoi de la clé utilisateur si elle existe (fallback serveur sinon)
+            ...(apiKey ? { apiKey } : {}),
           }),
         });
 
@@ -296,8 +290,12 @@ Utilise ce contexte pour donner des réponses pertinentes et personnalisées. Si
           } catch {
             // non-JSON response
           }
-          if (res.status === 401 || res.status === 403) {
-            errorMsg = "Clé Mistral non valide ou compte non autorisé pour ce modèle. Vérifiez votre clé dans ⚙️ Informations Générales.";
+          if (res.status === 503) {
+            errorMsg = "Service IA temporairement indisponible (clé API non configurée côté serveur). Contactez l'administrateur.";
+          } else if (res.status === 429) {
+            errorMsg = "Trop de requêtes. Patientez quelques secondes.";
+          } else if (res.status === 401 || res.status === 403) {
+            errorMsg = "Erreur d'authentification serveur (clé Mistral invalide). Contactez l'administrateur.";
           } else if (res.status === 502 || res.status === 503 || res.status === 504) {
             errorMsg = "Le serveur est temporairement indisponible. Réessayez dans quelques secondes.";
           }
