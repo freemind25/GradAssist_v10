@@ -247,12 +247,12 @@ export function TeacherLogin({
     // Données stockées en localStorage (pas de session serveur)
     const profile: TeacherProfile = {
       id: "guest_" + Date.now(),
-      name: "Enseignant",
+      fullName: "Enseignant",
       email: "local@gradeassist.app",
       department: "",
       role: "guest",
       loggedAt: new Date().toISOString(),
-    } as TeacherProfile;
+    };
     setTeacher(profile);
     toast({
       title: "Mode invité",
