@@ -119,7 +119,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^20",
     "@types/react": "^18",
-    "@types/react-dom": "^18",
+    "@types/react-dom": "^19",
     "@types/xlsx": "^0.0.36",
     "eslint": "^8",
     "eslint-config-next": "15.2.8",
