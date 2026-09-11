@@ -88,8 +88,8 @@ function loadGIS(): Promise<void> {
       return;
     }
     // Already loaded
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((window as any).google?.accounts) {
+    const w = window as unknown as { google?: { accounts?: { oauth2?: unknown } } };
+    if (w.google?.accounts?.oauth2) {
       resolve();
       return;
     }
