@@ -4,14 +4,14 @@ const config: CapacitorConfig = {
   appId: 'com.gradeassist.app',
   appName: 'GradeAssist',
   webDir: 'out',
-  // version: '2.9.0',  // Note: Capacitor n'a pas de champ version dans CapacitorConfig — géré dans build.gradle
   server: {
     androidScheme: 'https',
-    cleartext: true,
-    allowNavigation: ['*'],
+    url: 'https://grad-assist-v10.vercel.app/',
+    cleartext: false,
+    allowNavigation: ['grad-assist-v10.vercel.app', 'accounts.google.com', 'www.googleapis.com'],
   },
   android: {
-    allowMixedContent: true,
+    allowMixedContent: false,
   },
 };
 
