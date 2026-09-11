@@ -99,7 +99,7 @@
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
     "lucide-react": "^0.475.0",
-    "next": "15.2.8",
+    "next": "15.5.25",
     "patch-package": "^8.0.0",
     "pdfjs-dist": "^6.2.108",
     "react": "^18.3.1",
