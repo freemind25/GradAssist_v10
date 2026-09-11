@@ -40,19 +40,21 @@ const nextConfig: NextConfig = {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=()',
           },
-          // CSP sans nonce (fallback) — le middleware ajoutera le nonce sur les pages dynamiques
+          // CSP fallback (le middleware ajoute le nonce sur les pages dynamiques)
+          // Google Identity Services (accounts.google.com) + Drive API + OAuth requis
           {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline'",
+              "script-src 'self' 'unsafe-inline' https://accounts.google.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com data:",
-              "img-src 'self' data: blob:",
-              "connect-src 'self' https://api.mistral.ai https://www.googleapis.com",
+              "img-src 'self' data: blob: https:",
+              "connect-src 'self' https://api.mistral.ai https://www.googleapis.com https://oauth2.googleapis.com",
+              "frame-src 'self' https://accounts.google.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
-              "form-action 'self'",
+              "form-action 'self' https://accounts.google.com",
             ].join('; '),
           },
         ],
