@@ -2,6 +2,7 @@
   "name": "GradeAssist - Gestion Pédagogique Universitaire",
   "short_name": "GradeAssist",
   "description": "Application de gestion pédagogique universitaire — Évaluation, Présences, Encadrement, Tutorat & Assistant IA",
+  "version": "2.9.0",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",

@@ -8,6 +8,7 @@ import type { NextConfig } from 'next';
 // Le middleware est obligatoire car la CSP nécessite un nonce régénéré à chaque requête.
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   typescript: {
     ignoreBuildErrors: false,
   },
