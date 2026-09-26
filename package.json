@@ -32,17 +32,16 @@
       "wine": "1.0.1"
     },
     "files": [
-      "electron/**/*",
-      "!**/node_modules/**"
+      "electron/main.js",
+      "electron/preload.js",
+      "electron/icon.ico",
+      "electron/standalone/**/*",
+      "!package.json",
+      "!package-lock.json"
     ],
-    "extraResources": [
-      {
-        "from": "electron/standalone",
-        "to": "app",
-        "filter": ["**/*"]
-      }
-    ],
+    "extraResources": [],
     "asar": false,
+    "npmRebuild": false,
     "win": {
       "target": [
         {

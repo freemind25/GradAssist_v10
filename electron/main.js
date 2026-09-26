@@ -14,10 +14,9 @@ const PORT = 18529;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 function getStandalonePath() {
-  if (!app.isPackaged) {
-    return path.join(__dirname, 'standalone');
-  }
-  return path.join(process.resourcesPath, 'app');
+  // In packaged app: __dirname = resources/app/electron
+  // standalone is at resources/app/electron/standalone
+  return path.join(__dirname, 'standalone');
 }
 
 /**
@@ -66,7 +65,7 @@ function startServer() {
 }
 
 /** Attend que le serveur réponde (prêt à servir l'application). */
-function waitForServer(url, timeoutMs = 30000) {
+function waitForServer(url, timeoutMs = 60000) {
   const startedAt = Date.now();
   return new Promise((resolve, reject) => {
     const attempt = () => {
