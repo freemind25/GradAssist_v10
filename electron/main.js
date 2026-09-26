@@ -112,6 +112,9 @@ async function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,        // [SEC-11] Sandbox activé — sécurité renforcée
+      webSecurity: true,    // HTTPS + same-origin policy
+      allowRunningInsecureContent: false,
     },
     autoHideMenuBar: false,
     show: false,
@@ -133,6 +136,14 @@ async function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+  });
+
+  // [SEC-11] Restreindre la navigation à l'origine locale uniquement
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith(BASE_URL)) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
