@@ -1,6 +1,6 @@
 {
   "name": "gradeassist",
-  "version": "2.9.5",
+  "version": "2.9.6",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
@@ -19,7 +19,7 @@
     "electron:build": "next build && node scripts/copy-standalone.js && electron-builder --win --publish never",
     "electron:pack": "next build && node scripts/copy-standalone.js && electron-builder --win --dir --publish never"
   },
-  "description": "Application de gestion pédagogique universitaire — Évaluation, Présences, Encadrement, Tutorat & Assistant IA",
+  "description": "Application de gestion p\u00e9dagogique universitaire \u2014 \u00c9valuation, Pr\u00e9sences, Encadrement, Tutorat & Assistant IA",
   "author": "GradeAssist Team",
   "build": {
     "appId": "com.gradeassist.app",
@@ -34,10 +34,7 @@
     "files": [
       "electron/main.js",
       "electron/preload.js",
-      "electron/icon.ico",
-      "electron/standalone/**/*",
-      "!package.json",
-      "!package-lock.json"
+      "electron/icon.ico"
     ],
     "extraResources": [],
     "asar": false,
@@ -46,7 +43,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "electron/icon.ico"
