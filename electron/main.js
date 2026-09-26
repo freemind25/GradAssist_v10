@@ -4,33 +4,96 @@ const fs = require('fs');
 const http = require('http');
 const { spawn } = require('child_process');
 
-// Keep a global reference of the window object to prevent garbage collection
 let mainWindow = null;
 let splashWindow = null;
 let serverProcess = null;
 let serverStarting = null;
 
-// Fixed port required: Google Cloud Console must have this origin authorized
 const PORT = 18529;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 function getStandalonePath() {
-  // In packaged app: __dirname = resources/app/electron
-  // standalone is at resources/app/electron/standalone
   return path.join(__dirname, 'standalone');
 }
 
-/**
- * Démarre le serveur Next.js "standalone" (server.js).
- */
+// ─── HTML du splash (sans require, sans IPC — juste du visuel) ───
+const SPLASH_HTML = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: #1B2A4E;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    overflow: hidden;
+  }
+  .logo {
+    font-size: 38px;
+    font-weight: 800;
+    margin-bottom: 6px;
+    letter-spacing: -1px;
+  }
+  .logo .accent { color: #D97706; }
+  .subtitle {
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 28px;
+  }
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid rgba(255,255,255,0.12);
+    border-top-color: #D97706;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 14px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #status {
+    font-size: 13px;
+    color: rgba(255,255,255,0.7);
+    text-align: center;
+  }
+  .progress-bar {
+    width: 260px;
+    height: 3px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    margin-top: 14px;
+    overflow: hidden;
+  }
+  #progress {
+    height: 100%;
+    background: #D97706;
+    border-radius: 2px;
+    width: 5%;
+    transition: width 0.4s ease;
+  }
+</style>
+</head>
+<body>
+  <div class="logo">Grade<span class="accent">Assist</span></div>
+  <div class="subtitle">Gestion Pedagogique Universitaire</div>
+  <div class="spinner"></div>
+  <div id="status">Demarrage en cours...</div>
+  <div class="progress-bar"><div id="progress"></div></div>
+</body>
+</html>`;
+
+// ─── Serveur Next.js standalone ───
+
 function startServer() {
   const standalonePath = getStandalonePath();
   const serverJs = path.join(standalonePath, 'server.js');
   if (!fs.existsSync(serverJs)) {
-    throw new Error(
-      `server.js introuvable dans ${standalonePath}. ` +
-        "Recréez le paquet avec `next build` puis `node scripts/copy-standalone.js`."
-    );
+    throw new Error(`server.js introuvable dans ${standalonePath}`);
   }
 
   serverProcess = spawn(process.execPath, [serverJs], {
@@ -53,31 +116,26 @@ function startServer() {
     console.error(`[next] ${String(data).trim()}`);
   });
   serverProcess.on('exit', (code) => {
-    console.log(`[next] serveur arrêté (code ${code})`);
+    console.log(`[next] serveur arrete (code ${code})`);
     serverProcess = null;
   });
 
   return serverProcess;
 }
 
-/** Attend que le serveur réponde (prêt à servir l'application). */
-function waitForServer(url, timeoutMs = 60000, onProgress) {
+function waitForServer(url, timeoutMs, onTick) {
   const startedAt = Date.now();
   return new Promise((resolve, reject) => {
     const attempt = () => {
       const elapsed = Date.now() - startedAt;
-      if (onProgress) {
-        onProgress(elapsed, timeoutMs);
-      }
+      if (onTick) onTick(elapsed, timeoutMs);
       const req = http.get(url, (res) => {
         res.resume();
         resolve();
       });
       req.on('error', () => {
         if (Date.now() - startedAt > timeoutMs) {
-          reject(
-            new Error(`Le serveur local n'a pas répondu dans les ${timeoutMs / 1000} secondes.`)
-          );
+          reject(new Error(`Le serveur n'a pas repondu dans les ${timeoutMs / 1000}s.`));
         } else {
           setTimeout(attempt, 500);
         }
@@ -87,11 +145,11 @@ function waitForServer(url, timeoutMs = 60000, onProgress) {
   });
 }
 
-function ensureServerReady(onProgress) {
+function ensureServerReady(onTick) {
   if (!serverStarting) {
     serverStarting = (async () => {
       startServer();
-      await waitForServer(BASE_URL, 60000, onProgress);
+      await waitForServer(BASE_URL, 90000, onTick);
     })().catch((error) => {
       serverStarting = null;
       throw error;
@@ -100,127 +158,57 @@ function ensureServerReady(onProgress) {
   return serverStarting;
 }
 
-/**
- * Crée la fenêtre splash de chargement (affichée immédiatement pendant le démarrage).
- */
+// ─── Splash window ───
+
 function createSplashWindow() {
   splashWindow = new BrowserWindow({
-    width: 500,
-    height: 350,
+    width: 480,
+    height: 320,
     frame: false,
-    transparent: false,
     resizable: false,
     minimizable: false,
     maximizable: false,
     alwaysOnTop: true,
-    skipTaskbar: false,
+    center: true,
     show: true,
     icon: path.join(__dirname, 'icon.ico'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false,
     },
   });
 
-  splashWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(`
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #1B2A4E;
-    color: #fff;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    user-select: none;
-    -webkit-app-region: drag;
-  }
-  .logo {
-    font-size: 36px;
-    font-weight: 800;
-    margin-bottom: 8px;
-  }
-  .logo .accent { color: #D97706; }
-  .subtitle {
-    font-size: 13px;
-    color: rgba(255,255,255,0.6);
-    margin-bottom: 30px;
-  }
-  .spinner {
-    width: 36px;
-    height: 36px;
-    border: 3px solid rgba(255,255,255,0.15);
-    border-top-color: #D97706;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin-bottom: 16px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .status {
-    font-size: 12px;
-    color: rgba(255,255,255,0.5);
-    text-align: center;
-  }
-  .progress-bar {
-    width: 280px;
-    height: 4px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 2px;
-    margin-top: 16px;
-    overflow: hidden;
-  }
-  .progress-fill {
-    height: 100%;
-    background: #D97706;
-    border-radius: 2px;
-    transition: width 0.5s ease;
-    width: 0%;
-  }
-</style>
-</head>
-<body>
-  <div class="logo">Grade<span class="accent">Assist</span></div>
-  <div class="subtitle">Application de Gestion Pedagogique Universitaire</div>
-  <div class="spinner"></div>
-  <div class="status" id="status">Demarrage du serveur local...</div>
-  <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
-  <script>
-    const { ipcRenderer } = require('electron');
-    ipcRenderer.on('loading-progress', (event, data) => {
-      document.getElementById('status').textContent = data.message;
-      const pct = Math.min(95, (data.elapsed / data.timeout) * 100);
-      document.getElementById('progress').style.width = pct + '%';
-    });
-    ipcRenderer.on('loading-done', () => {
-      document.getElementById('status').textContent = 'Presque pret...';
-      document.getElementById('progress').style.width = '100%';
-    });
-    ipcRenderer.on('loading-error', (event, data) => {
-      document.getElementById('status').textContent = 'Erreur: ' + data.message;
-      document.querySelector('.spinner').style.display = 'none';
-      document.getElementById('progress').style.width = '0%';
-    });
-  </script>
-</body>
-</html>
-  `));
+  splashWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(SPLASH_HTML));
 
   splashWindow.on('closed', () => {
     splashWindow = null;
   });
 }
 
+function updateSplash(message, progressPct) {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.webContents.executeJavaScript(
+      `document.getElementById('status').textContent='${message}';` +
+      `document.getElementById('progress').style.width='${progressPct}%';`
+    ).catch(() => {});
+  }
+}
+
+function closeSplash() {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.close();
+    splashWindow = null;
+  }
+}
+
+// ─── Main window ───
+
 async function createWindow() {
-  // Afficher la fenêtre splash immédiatement
+  // 1. Splash immédiat
   createSplashWindow();
 
-  // Créer la fenêtre principale (masquée)
+  // 2. Fenêtre principale (masquée)
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -231,72 +219,64 @@ async function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true,
+      sandbox: false,
       webSecurity: true,
       allowRunningInsecureContent: false,
     },
     autoHideMenuBar: false,
-    show: false,  // Masquée jusqu'au chargement complet
+    show: false,
   });
 
-  // Démarrer le serveur avec feedback de progression
+  // 3. Démarrer le serveur avec feedback
   try {
+    updateSplash('Demarrage du serveur local...', 10);
+
     await ensureServerReady((elapsed, timeout) => {
-      if (splashWindow && !splashWindow.isDestroyed()) {
-        const seconds = Math.floor(elapsed / 1000);
-        splashWindow.webContents.send('loading-progress', {
-          message: `Demarrage du serveur... (${seconds}s)`,
-          elapsed: elapsed,
-          timeout: timeout,
-        });
-      }
+      const seconds = Math.floor(elapsed / 1000);
+      const pct = Math.min(90, 10 + (elapsed / timeout) * 80);
+      updateSplash(`Demarrage du serveur... (${seconds}s)`, Math.round(pct));
     });
 
-    // Serveur pret — charger l'application
-    if (splashWindow && !splashWindow.isDestroyed()) {
-      splashWindow.webContents.send('loading-done');
-    }
+    updateSplash('Chargement de l application...', 95);
 
+    // 4. Charger l'app dans la fenêtre principale
     await mainWindow.loadURL(BASE_URL);
 
-    // Fermer le splash et afficher la fenêtre principale
+    // 5. Fermer le splash et afficher la fenêtre
     mainWindow.once('ready-to-show', () => {
-      if (splashWindow && !splashWindow.isDestroyed()) {
-        splashWindow.close();
-        splashWindow = null;
-      }
+      closeSplash();
       mainWindow.show();
       mainWindow.focus();
     });
 
-    // Si ready-to-show ne se déclenche pas dans les 10s, forcer l'affichage
+    // Safety: forcer l'affichage après 8s même si ready-to-show ne se déclenche pas
     setTimeout(() => {
       if (mainWindow && !mainWindow.isVisible()) {
-        if (splashWindow && !splashWindow.isDestroyed()) {
-          splashWindow.close();
-          splashWindow = null;
-        }
+        closeSplash();
         mainWindow.show();
         mainWindow.focus();
       }
-    }, 10000);
+    }, 8000);
 
   } catch (error) {
-    console.error('Failed to start local server:', error);
-    if (splashWindow && !splashWindow.isDestroyed()) {
-      splashWindow.webContents.send('loading-error', { message: error.message });
-    }
+    console.error('Erreur:', error);
+    updateSplash('Erreur: ' + error.message, 0);
     setTimeout(() => {
+      closeSplash();
       dialog.showErrorBox(
         'GradeAssist — Erreur de demarrage',
-        `Impossible de demarrer le serveur local de l'application.\n\n${error.message}\n\nVerifiez que l'antivirus ne bloque pas l'application.`
+        `Impossible de demarrer le serveur local.\n\n${error.message}\n\n` +
+        'Solutions possibles:\n' +
+        '1. Verifiez que votre antivirus ne bloque pas GradeAssist.exe\n' +
+        '2. Essayez de lancer GradeAssist.exe en tant qu\'administrateur\n' +
+        '3. Utilisez la version web: https://grad-assist-v10.vercel.app/'
       );
       app.quit();
-    }, 2000);
+    }, 3000);
     return;
   }
 
-  // [SEC-11] Restreindre la navigation a l'origine locale uniquement
+  // Sécurité : restreindre la navigation
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (!url.startsWith(BASE_URL)) {
       event.preventDefault();
@@ -314,7 +294,8 @@ async function createWindow() {
   });
 }
 
-// Single instance lock
+// ─── App lifecycle ───
+
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
@@ -339,7 +320,6 @@ if (!gotTheLock) {
 }
 
 app.on('window-all-closed', () => {
-  // Arrêter le serveur Next.js local
   if (serverProcess) {
     serverProcess.kill();
     serverProcess = null;
