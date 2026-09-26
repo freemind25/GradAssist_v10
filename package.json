@@ -28,8 +28,12 @@
     "directories": {
       "output": "dist-electron"
     },
+    "toolsets": {
+      "wine": "1.0.1"
+    },
     "files": [
-      "electron/**/*"
+      "electron/**/*",
+      "!**/node_modules/**"
     ],
     "extraResources": [
       {

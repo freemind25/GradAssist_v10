@@ -73,6 +73,13 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Initialiser la table users si pas déjà fait (sécurise le premier usage)
+      try {
+        await initializeDatabase();
+      } catch {
+        // La table existe probablement déjà — ignorer
+      }
+
       const user = await getUserByEmail(email);
       if (!user) {
         return NextResponse.json(
@@ -138,6 +145,13 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Initialiser la table users si pas déjà fait (AVANT toute requête dessus)
+      try {
+        await initializeDatabase();
+      } catch {
+        // La table existe probablement déjà — ignorer
+      }
+
       // Vérifier email non déjà utilisé
       const exists = await emailExists(email);
       if (exists) {
@@ -145,13 +159,6 @@ export async function POST(request: NextRequest) {
           { error: "Cet email est déjà utilisé. Connectez-vous." },
           { status: 409 }
         );
-      }
-
-      // Initialiser la table users si pas déjà fait
-      try {
-        await initializeDatabase();
-      } catch {
-        // La table existe probablement déjà — ignorer
       }
 
       // Hacher le mot de passe

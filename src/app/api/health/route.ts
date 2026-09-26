@@ -18,10 +18,10 @@ export async function GET() {
       timestamp: true,
     };
 
-    // Vérifier les variables d'environnement critiques
+    // Vérifier les variables d'environnement critiques (auth Neon + JWT)
     const envOk = !!(
-      process.env.NEXTAUTH_SECRET ||
-      process.env.NEXT_PUBLIC_SUPABASE_URL
+      process.env.JWT_SECRET &&
+      process.env.DATABASE_URL
     );
     checks.envConfigured = envOk;
 
