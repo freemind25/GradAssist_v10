@@ -7,8 +7,15 @@ import type { NextConfig } from 'next';
 // [SEC-09] En-têtes de sécurité HTTP gérés dans middleware.ts (CSP avec nonce dynamique).
 // Le middleware est obligatoire car la CSP nécessite un nonce régénéré à chaque requête.
 
+// Static export temporaire pour les builds Electron/Capacitor (NEXT_STATIC_EXPORT=1).
+// Par défaut : 'standalone' pour Vercel (serverful, API routes /api/* actives).
+const isStaticExport = process.env.NEXT_STATIC_EXPORT === '1';
+
 const nextConfig: NextConfig = {
-  output: 'standalone',
+  output: isStaticExport ? 'export' : 'standalone',
+  // Limite les workers de génération : la sandbox a un plafond mémoire de 2 Go
+  // et 96 cœurs -> Next en lance trop, d'où un SIGKILL (OOM) sans ces options.
+  experimental: { workerThreads: false, cpus: 1 },
   typescript: {
     ignoreBuildErrors: false,
   },

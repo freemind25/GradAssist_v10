@@ -1,37 +1,19 @@
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, dialog } = require('electron');
 const path = require('path');
-const http = require('http');
 const fs = require('fs');
+const http = require('http');
+const { spawn } = require('child_process');
 
 // Keep a global reference of the window object to prevent garbage collection
-let mainWindow;
-let server;
+let mainWindow = null;
+let serverProcess = null;
+let serverStarting = null;
 
-// MIME types for static files
-const MIME_TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'application/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-  '.ttf': 'font/ttf',
-  '.eot': 'application/vnd.ms-fontobject',
-  '.otf': 'font/otf',
-  '.webp': 'image/webp',
-  '.mp4': 'video/mp4',
-  '.webm': 'video/webm',
-  '.txt': 'text/plain; charset=utf-8',
-  '.xml': 'application/xml; charset=utf-8',
-};
+// Fixed port required: Google Cloud Console must have this origin authorized
+const PORT = 18529;
+const BASE_URL = `http://127.0.0.1:${PORT}`;
 
-function getStaticPath() {
+function getStandalonePath() {
   if (!app.isPackaged) {
     return path.join(__dirname, 'standalone');
   }
@@ -39,76 +21,87 @@ function getStaticPath() {
 }
 
 /**
- * Create a local HTTP server to serve static files.
- * Google OAuth requires HTTP context, not file:// protocol.
+ * Démarre le serveur Next.js "standalone" (server.js).
+ *
+ * Contrairement à un simple serveur de fichiers statiques, ce serveur exécute
+ * l'application complète ET les routes API (/api/mistral, /api/auth, /api/health),
+ * exactement comme en production. C'est la sortie de `next build`
+ * (output: 'standalone') préparée par scripts/copy-standalone.js.
  */
-function createLocalServer(staticPath, port) {
+function startServer() {
+  const standalonePath = getStandalonePath();
+  const serverJs = path.join(standalonePath, 'server.js');
+  if (!fs.existsSync(serverJs)) {
+    throw new Error(
+      `server.js introuvable dans ${standalonePath}. ` +
+        "Recréez le paquet avec `next build` puis `node scripts/copy-standalone.js`."
+    );
+  }
+
+  serverProcess = spawn(process.execPath, [serverJs], {
+    cwd: standalonePath,
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1', // exécute Electron en mode Node pur
+      NODE_ENV: 'production',
+      PORT: String(PORT),
+      HOSTNAME: '127.0.0.1',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
+
+  serverProcess.stdout.on('data', (data) => {
+    console.log(`[next] ${String(data).trim()}`);
+  });
+  serverProcess.stderr.on('data', (data) => {
+    console.error(`[next] ${String(data).trim()}`);
+  });
+  serverProcess.on('exit', (code) => {
+    console.log(`[next] serveur arrêté (code ${code})`);
+    serverProcess = null;
+  });
+
+  return serverProcess;
+}
+
+/** Attend que le serveur réponde (prêt à servir l'application). */
+function waitForServer(url, timeoutMs = 30000) {
+  const startedAt = Date.now();
   return new Promise((resolve, reject) => {
-    const httpServer = http.createServer((req, res) => {
-      let url = decodeURIComponent(req.url);
-
-      // Default to index.html
-      if (url === '/' || url === '') {
-        url = '/index.html';
-      }
-
-      // Remove query strings
-      url = url.split('?')[0];
-
-      const filePath = path.join(staticPath, url);
-
-      // Security: prevent directory traversal
-      if (!filePath.startsWith(staticPath)) {
-        res.writeHead(403);
-        res.end('Forbidden');
-        return;
-      }
-
-      fs.stat(filePath, (err, stats) => {
-        if (err || !stats.isFile()) {
-          // SPA fallback: serve index.html for unknown routes
-          const indexPath = path.join(staticPath, 'index.html');
-          fs.readFile(indexPath, (err2, data) => {
-            if (err2) {
-              res.writeHead(404);
-              res.end('Not Found');
-              return;
-            }
-            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-            res.end(data);
-          });
-          return;
-        }
-
-        const ext = path.extname(filePath).toLowerCase();
-        const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-
-        fs.readFile(filePath, (err3, data) => {
-          if (err3) {
-            res.writeHead(500);
-            res.end('Internal Server Error');
-            return;
-          }
-          res.writeHead(200, { 'Content-Type': contentType });
-          res.end(data);
-        });
+    const attempt = () => {
+      const req = http.get(url, (res) => {
+        res.resume(); // drain la réponse
+        resolve();
       });
-    });
-
-    httpServer.listen(port, '127.0.0.1', () => {
-      console.log(`GradeAssist server running at http://localhost:${port}`);
-      resolve(httpServer);
-    });
-
-    httpServer.on('error', (error) => {
-      reject(error);
-    });
+      req.on('error', () => {
+        if (Date.now() - startedAt > timeoutMs) {
+          reject(
+            new Error(`Le serveur local n'a pas répondu dans les ${timeoutMs / 1000} secondes.`)
+          );
+        } else {
+          setTimeout(attempt, 300);
+        }
+      });
+    };
+    attempt();
   });
 }
 
-function createWindow() {
-  const staticPath = getStaticPath();
+function ensureServerReady() {
+  if (!serverStarting) {
+    serverStarting = (async () => {
+      startServer();
+      await waitForServer(BASE_URL);
+    })().catch((error) => {
+      serverStarting = null; // permet une nouvelle tentative
+      throw error;
+    });
+  }
+  return serverStarting;
+}
 
+async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -124,20 +117,19 @@ function createWindow() {
     show: false,
   });
 
-  // Load from local HTTP server (required for Google OAuth)
-  // Fixed port required: Google Cloud Console must have this origin authorized
-  const port = 18529;
-  createLocalServer(staticPath, port)
-    .then((httpServer) => {
-      server = httpServer;
-      mainWindow.loadURL(`http://127.0.0.1:${port}`);
-    })
-    .catch((error) => {
-      console.error('Failed to start local server:', error);
-      // Fallback: try loading file directly (OAuth won't work)
-      const indexPath = path.join(staticPath, 'index.html');
-      mainWindow.loadFile(indexPath);
-    });
+  // Load from the local Next.js server (required for Google OAuth + API routes)
+  try {
+    await ensureServerReady();
+    await mainWindow.loadURL(BASE_URL);
+  } catch (error) {
+    console.error('Failed to start local server:', error);
+    dialog.showErrorBox(
+      'GradeAssist — Erreur de démarrage',
+      `Impossible de démarrer le serveur local de l'application.\n\n${error.message}`
+    );
+    app.quit();
+    return;
+  }
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -178,9 +170,10 @@ if (!gotTheLock) {
 }
 
 app.on('window-all-closed', () => {
-  // Close the local HTTP server
-  if (server) {
-    server.close();
+  // Arrêter le serveur Next.js local
+  if (serverProcess) {
+    serverProcess.kill();
+    serverProcess = null;
   }
   if (process.platform !== 'darwin') {
     app.quit();
