@@ -247,10 +247,14 @@ function PdfPagesView({ dataUrl }: { dataUrl: string }) {
       try {
         setLoading(true);
         setError(null);
-        const pdfjsLib = await import('pdfjs-dist');
+        // Build « legacy » : pdf.js v6 repose sur des API JS très récentes
+        // (Uint8Array.toHex(), nécessite Chromium ≥ 140) absentes de
+        // l'app Desktop Electron 33 (Chromium 130) — erreur « n.toHex is
+        // not a function ». Le build legacy conserve la compatibilité.
+        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
         // Worker servi depuis la même origine (copié dans public/ au postinstall).
         // unpkg.com est bloqué par la CSP de production (script-src 'self').
-        pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.legacy.min.mjs';
 
         // Décodage local du data URL (base64 → octets) — aucune requête réseau.
         // fetch() sur une URL blob:/data: est bloqué par la CSP de production
