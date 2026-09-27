@@ -1,6 +1,6 @@
 {
   "name": "gradeassist",
-  "version": "2.9.6",
+  "version": "2.9.7",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
@@ -34,7 +34,11 @@
     "files": [
       "electron/main.js",
       "electron/preload.js",
-      "electron/icon.ico"
+      "electron/icon.ico",
+      "!**/node_modules/**",
+      "!**/.next/**",
+      "!**/src/**",
+      "!**/standalone/**"
     ],
     "extraResources": [],
     "asar": false,

@@ -22,20 +22,18 @@ jobs:
         with:
           node-version: 20
 
+      # L'app Desktop charge https://grad-assist-v10.vercel.app/ directement :
+      # aucun build Next.js ni standalone n'est nécessaire ici.
       - name: Install dependencies
         run: npm install --legacy-peer-deps
         env:
           CYPRESS_INSTALL_BINARY: 0
           NEXT_TELEMETRY_DISABLED: 1
 
-      - name: Build Next.js (standalone server bundle)
-        run: npx next build
-
-      - name: Prepare standalone bundle for Electron
-        run: node scripts/copy-standalone.js
-
       - name: Build Electron installer (.exe)
         run: npx electron-builder --win --publish never
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
