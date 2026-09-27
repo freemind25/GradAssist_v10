@@ -10,6 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "postinstall": "node scripts/copy-pdf-worker.js",
     "typecheck": "tsc --noEmit",
     "quality": "npm run lint && npm run typecheck",
     "cy:open": "cypress open",
