@@ -252,11 +252,27 @@ function PdfPagesView({ dataUrl }: { dataUrl: string }) {
         // unpkg.com est bloqué par la CSP de production (script-src 'self').
         pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
-        const response = await fetch(dataUrl);
-        if (!response.ok) {
-          throw new Error(`Chargement du fichier impossible (${response.status})`);
+        // Décodage local du data URL (base64 → octets) — aucune requête réseau.
+        // fetch() sur une URL blob:/data: est bloqué par la CSP de production
+        // (connect-src 'self'), d'où l'erreur "Failed to fetch" observée.
+        let arrayBuffer: ArrayBuffer;
+        if (dataUrl.startsWith('data:')) {
+          const parts = dataUrl.split(',');
+          if (parts.length < 2) {
+            throw new Error('Contenu PDF illisible (data URL malformée)');
+          }
+          const binary = atob(parts[1]);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          arrayBuffer = bytes.buffer;
+        } else {
+          // URL blob: ou http(s) — conversion via Blob sans fetch réseau
+          const res = await fetch(dataUrl);
+          if (!res.ok) {
+            throw new Error(`Chargement du fichier impossible (${res.status})`);
+          }
+          arrayBuffer = await res.arrayBuffer();
         }
-        const arrayBuffer = await response.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
         const renderedPages: string[] = [];
@@ -337,6 +353,7 @@ export function SyllabusTracker({ syllabus: syllabusProp, setSyllabus, moduleNam
   const [view, setView] = useState<'chapters' | 'planning' | 'preview'>('chapters');
   const [searchTerm, setSearchTerm] = useState('');
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
   // Load PDF from IndexedDB on mount or when fileName changes
@@ -346,6 +363,8 @@ export function SyllabusTracker({ syllabus: syllabusProp, setSyllabus, moduleNam
       loadPdfFromIDB()
         .then((dataUrl) => {
           if (dataUrl) {
+            // Data URL brut pour l'aperçu (décodage local, sans réseau/CSP)
+            setPdfDataUrl(dataUrl);
             // Convert base64 data URL to Blob URL for iframe (avoids data URL size issues)
             const parts = dataUrl.split(',');
             const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/pdf';
@@ -356,12 +375,14 @@ export function SyllabusTracker({ syllabus: syllabusProp, setSyllabus, moduleNam
             const blobUrl = URL.createObjectURL(blob);
             setPdfBlobUrl(blobUrl);
           } else {
+            setPdfDataUrl(null);
             setPdfBlobUrl(null);
           }
         })
-        .catch(() => setPdfBlobUrl(null))
+        .catch(() => { setPdfDataUrl(null); setPdfBlobUrl(null); })
         .finally(() => setPdfLoading(false));
     } else {
+      setPdfDataUrl(null);
       setPdfBlobUrl(null);
     }
   }, [syllabus.pdfFileName]);
@@ -416,6 +437,7 @@ export function SyllabusTracker({ syllabus: syllabusProp, setSyllabus, moduleNam
       const blob = new Blob([bytes], { type: mime });
       const blobUrl = URL.createObjectURL(blob);
       setPdfBlobUrl(blobUrl);
+      setPdfDataUrl(dataUrl);
 
       toast({
         title: "PDF importé",
@@ -532,6 +554,7 @@ export function SyllabusTracker({ syllabus: syllabusProp, setSyllabus, moduleNam
     try { await savePdfToIDB(null); } catch { /* ignore */ }
     if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
     setPdfBlobUrl(null);
+    setPdfDataUrl(null);
     setSyllabus({ ...syllabus, pdfFileName: null, pdfDataUrl: null });
     toast({ title: "PDF supprimé", description: "Le fichier PDF a été retiré." });
   };
@@ -795,6 +818,8 @@ export function SyllabusTracker({ syllabus: syllabusProp, setSyllabus, moduleNam
                 <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
                 <p>Chargement du PDF...</p>
               </div>
+            ) : pdfDataUrl ? (
+              <PdfPagesView dataUrl={pdfDataUrl} />
             ) : pdfBlobUrl ? (
               <PdfPagesView dataUrl={pdfBlobUrl} />
             ) : (
