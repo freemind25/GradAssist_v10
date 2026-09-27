@@ -248,9 +248,14 @@ function PdfPagesView({ dataUrl }: { dataUrl: string }) {
         setLoading(true);
         setError(null);
         const pdfjsLib = await import('pdfjs-dist');
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+        // Worker servi depuis la même origine (copié dans public/ au postinstall).
+        // unpkg.com est bloqué par la CSP de production (script-src 'self').
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
         const response = await fetch(dataUrl);
+        if (!response.ok) {
+          throw new Error(`Chargement du fichier impossible (${response.status})`);
+        }
         const arrayBuffer = await response.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
@@ -277,7 +282,13 @@ function PdfPagesView({ dataUrl }: { dataUrl: string }) {
         }
       } catch (err) {
         if (!cancelled) {
-          setError('Impossible de lire le PDF. Fichier corrompu ou non supporté.');
+          console.error('[syllabus] Erreur de rendu PDF:', err);
+          const detail = err instanceof Error && err.message ? err.message : '';
+          setError(
+            'Impossible de lire le PDF.' +
+            (detail ? ` (${detail})` : ' Fichier corrompu ou non supporté.') +
+            ' Vous pouvez le réimporter depuis l\'onglet Chapters.'
+          );
           setLoading(false);
         }
       }

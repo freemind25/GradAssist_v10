@@ -3,6 +3,9 @@ node_modules/
 .pnp
 .pnp.js
 
+# ── Worker pdf.js (copié par scripts/copy-pdf-worker.js au postinstall) ──
+public/pdf.worker.min.mjs
+
 # ── Build Next.js ─────────────────────────────────────────────────────
 .next/
 out/
