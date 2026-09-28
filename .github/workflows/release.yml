@@ -60,8 +60,8 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      # Pas de setup-android : le SDK est déjà présent sur ubuntu-latest
+      # (ANDROID_HOME préconfiguré) et AGP télécharge tout composant manquant.
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
