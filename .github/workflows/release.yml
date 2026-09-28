@@ -1,4 +1,4 @@
-name: Build & Release Windows Installer
+name: Build & Release (Windows + Android)
 
 on:
   push:
@@ -42,8 +42,47 @@ jobs:
           path: dist-electron/*.exe
           if-no-files-found: error
 
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java 21 (requis par Gradle 8.14)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+        env:
+          CYPRESS_INSTALL_BINARY: 0
+          NEXT_TELEMETRY_DISABLED: 1
+
+      # android/ est versionné (sources + config embarquée pointant vers
+      # https://grad-assist-v10.vercel.app/) : pas de `npx cap add` requis.
+      - name: Build APK (release, signé)
+        run: cd android && ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GradeAssist-APK
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
   release:
-    needs: build-windows
+    needs: [build-windows, build-android]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
 
@@ -54,10 +93,22 @@ jobs:
           name: GradeAssist-Installer
           path: dist
 
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: GradeAssist-APK
+          path: dist
+
+      - name: Rename APK with version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          for f in dist/*.apk; do mv "$f" "dist/GradeAssist-${VERSION}.apk"; done
+          ls -la dist/
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.exe
+          files: dist/*
           generate_release_notes: true
           draft: false
           prerelease: false

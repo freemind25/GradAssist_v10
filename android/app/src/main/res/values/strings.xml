@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GradeAssist</string>
+    <string name="title_activity_main">GradeAssist</string>
+    <string name="package_name">com.gradeassist.app</string>
+    <string name="custom_url_scheme">com.gradeassist.app</string>
+</resources>
