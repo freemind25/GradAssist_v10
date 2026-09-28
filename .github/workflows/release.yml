@@ -49,10 +49,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Node 22 requis par la CLI Capacitor 8 ("requires NodeJS >=22.0.0")
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Setup Java 21 (requis par Gradle 8.14)
         uses: actions/setup-java@v4
