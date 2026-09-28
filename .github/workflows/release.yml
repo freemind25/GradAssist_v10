@@ -69,8 +69,18 @@ jobs:
           CYPRESS_INSTALL_BINARY: 0
           NEXT_TELEMETRY_DISABLED: 1
 
-      # android/ est versionné (sources + config embarquée pointant vers
-      # https://grad-assist-v10.vercel.app/) : pas de `npx cap add` requis.
+      # Génère capacitor-cordova-android-plugins/, régénère la config
+      # embarquée (URL Vercel depuis capacitor.config.ts) et copie out/.
+      # android/ étant versionné, `npx cap add` n'est pas requis.
+      # L'app charge Vercel en ligne : un stub de redirection suffit dans out/.
+      - name: Capacitor sync
+        run: |
+          mkdir -p out
+          printf '<!doctype html><meta charset="utf-8"><title>GradeAssist</title><script>location.replace("https://grad-assist-v10.vercel.app/")</script>' > out/index.html
+          npx cap sync android
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+
       - name: Build APK (release, signé)
         run: cd android && ./gradlew assembleRelease --no-daemon --stacktrace
 
