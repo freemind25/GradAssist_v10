@@ -1,6 +1,6 @@
 {
   "name": "gradeassist",
-  "version": "2.9.8",
+  "version": "2.9.9",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
@@ -18,7 +18,8 @@
     "cy:run:smoke": "cypress run --spec \"cypress/e2e/00-smoke.cy.ts\"",
     "electron:dev": "next build && node scripts/copy-standalone.js && electron .",
     "electron:build": "next build && node scripts/copy-standalone.js && electron-builder --win --publish never",
-    "electron:pack": "next build && node scripts/copy-standalone.js && electron-builder --win --dir --publish never"
+    "electron:pack": "next build && node scripts/copy-standalone.js && electron-builder --win --dir --publish never",
+    "cap:sync": "npx cap sync android"
   },
   "description": "Application de gestion p\u00e9dagogique universitaire \u2014 \u00c9valuation, Pr\u00e9sences, Encadrement, Tutorat & Assistant IA",
   "author": "GradeAssist Team",
