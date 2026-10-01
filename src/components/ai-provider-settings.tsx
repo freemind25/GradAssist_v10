@@ -1,10 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KeyRound, ExternalLink, Check, Sparkles } from "lucide-react";
+import {
+  KeyRound,
+  ExternalLink,
+  Check,
+  Sparkles,
+  Loader2,
+  FlaskConical,
+  XCircle,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -24,11 +34,18 @@ import {
  * Sélection du fournisseur IA + clé API personnelle (BYOK).
  * Tout est stocké en localStorage côté client ; la clé n'est envoyée
  * qu'au proxy /api/ai au moment d'une demande.
+ * Le bouton « Tester la clé » envoie une vraie requête via le proxy
+ * pour vérifier clé + modèle auprès du fournisseur choisi.
  */
 export function AiProviderSettings() {
   const [providerId, setProviderId] = useState(DEFAULT_AI_PROVIDER_ID);
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
 
   // Chargement initial (localStorage) + migration de l'ancienne clé Mistral
   useEffect(() => {
@@ -51,6 +68,7 @@ export function AiProviderSettings() {
 
   const handleProviderChange = (id: string) => {
     setProviderId(id);
+    setTestResult(null);
     localStorage.setItem(AI_STORAGE_KEYS.provider, id);
     // Le modèle sauvegardé peut ne pas exister chez le nouveau fournisseur
     setModel("");
@@ -59,6 +77,7 @@ export function AiProviderSettings() {
 
   const handleKeyChange = (value: string) => {
     setApiKey(value);
+    setTestResult(null);
     if (value) {
       localStorage.setItem(AI_STORAGE_KEYS.apiKey, value);
       localStorage.removeItem(LEGACY_MISTRAL_KEY);
@@ -69,10 +88,73 @@ export function AiProviderSettings() {
 
   const handleModelChange = (value: string) => {
     setModel(value);
+    setTestResult(null);
     if (value) {
       localStorage.setItem(AI_STORAGE_KEYS.model, value.trim());
     } else {
       localStorage.removeItem(AI_STORAGE_KEYS.model);
+    }
+  };
+
+  const handleTestKey = async () => {
+    if (!apiKey || apiKey.trim().length < 8) {
+      setTestResult({
+        ok: false,
+        message: "Collez d'abord votre clé API dans le champ ci-dessus.",
+      });
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      // Vraie requête via le proxy : valide la clé ET le modèle exactement
+      // comme le fera l'assistant (mêmes validations, même endpoint).
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "system",
+              content:
+                "Tu es l'assistant IA de GradeAssist. Réponds en français, de manière très concise.",
+            },
+            {
+              role: "user",
+              content:
+                "Test de connexion : réponds en une phrase que la clé fonctionne.",
+            },
+          ],
+          providerId,
+          apiKey: apiKey.trim(),
+          ...(model.trim() ? { model: model.trim() } : {}),
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.content) {
+        const snippet = String(data.content).slice(0, 120);
+        setTestResult({
+          ok: true,
+          message: `Connexion réussie à ${provider.name}${
+            data.model ? ` (modèle ${data.model})` : ""
+          }. Réponse : « ${snippet}${String(data.content).length > 120 ? "…" : ""} »`,
+        });
+      } else {
+        setTestResult({
+          ok: false,
+          message:
+            data?.error ||
+            `Échec du test (${res.status}). Vérifiez votre clé et le nom du modèle.`,
+        });
+      }
+    } catch {
+      setTestResult({
+        ok: false,
+        message:
+          "Impossible de joindre le serveur GradeAssist. Vérifiez votre connexion internet.",
+      });
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -159,6 +241,47 @@ export function AiProviderSettings() {
           placeholder={provider.defaultModel}
           className="h-8 text-xs"
         />
+      </div>
+
+      {/* Test de la clé : vraie requête via le proxy /api/ai */}
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 border-accent/30 text-accent hover:bg-accent/10 hover:text-accent"
+            onClick={handleTestKey}
+            disabled={testing || !apiKey}
+          >
+            {testing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <FlaskConical className="h-3.5 w-3.5" />
+            )}
+            {testing ? "Test en cours…" : "Tester la clé"}
+          </Button>
+          <span className="text-[11px] text-muted-foreground">
+            Vérifie la clé et le modèle auprès du fournisseur.
+          </span>
+        </div>
+        {testResult && (
+          <p
+            className={cn(
+              "text-[11px] leading-snug flex items-start gap-1.5 rounded-md px-2 py-1.5",
+              testResult.ok
+                ? "text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-950/30"
+                : "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950/30"
+            )}
+          >
+            {testResult.ok ? (
+              <Check className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            ) : (
+              <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            )}
+            <span>{testResult.message}</span>
+          </p>
+        )}
       </div>
 
       <p className="text-[11px] text-muted-foreground/70">
