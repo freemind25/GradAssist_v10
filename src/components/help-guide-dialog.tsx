@@ -47,7 +47,7 @@ const sections = [
       "Ajoutez les noms des enseignants (maximum 3).",
       "Uploadez le logo de l'université pour les exports PDF.",
       "Renseignez l'email de l'administration pour l'envoi des rapports.",
-      "Si vous disposez d'une clé API Mistral AI, collez-la dans le champ dédié pour activer l'assistant IA.",
+      "Pour activer l'assistant IA, choisissez un fournisseur (RoutesMe, Groq, Gemini…) et collez votre clé API dans la section « Assistant IA » — voir la section « Obtenir une clé API IA (gratuit) » ci-dessous.",
     ],
   },
   {
@@ -61,7 +61,7 @@ const sections = [
       "Pour les Matières classiques : saisissez la note CC et la note Examen, puis ajustez la pondération.",
       "Vous pouvez ajouter ou supprimer des critères d'évaluation personnalisés.",
       "Cliquez sur « Ajouter à la Synthèse et Réinitialiser » pour sauvegarder et passer à l'étudiant suivant.",
-      "Le bouton « ✨ IA » génère des commentaires d'évaluation personnalisés (nécessite une clé API Mistral).",
+      "Le bouton « ✨ IA » génère des commentaires d'évaluation personnalisés (nécessite une clé API IA configurée).",
     ],
   },
   {
@@ -142,31 +142,29 @@ const sections = [
   },
   {
     icon: Sparkles,
-    title: "Assistant IA (Mistral AI)",
+    title: "Assistant IA (multi-fournisseurs)",
     color: "text-violet-600",
     steps: [
       "Dans l'onglet Évaluation, cliquez sur « ✨ IA » pour ouvrir l'assistant.",
       "Choisissez une action rapide : Commentaires, Analyse des présences, Synthèse encadrement, Rapport mensuel, Aide au planning.",
       "L'assistant analyse les données du module et génère des réponses contextuelles en français.",
       "Vous pouvez aussi poser des questions libres sur vos données d'évaluation.",
-      "⚠️ Nécessite une clé API Mistral AI (configurée dans Informations Générales → Clé API Mistral AI).",
+      "⚠️ Nécessite une clé API IA : choisissez un fournisseur et collez votre clé dans Informations Générales → Assistant IA (RoutesMe et Groq offrent un accès gratuit).",
     ],
   },
   {
     icon: Sparkles,
-    title: "Obtenir une clé API Mistral AI (gratuit)",
+    title: "Obtenir une clé API IA (gratuit)",
     color: "text-indigo-600",
     steps: [
-      "Ouvrez https://console.mistral.ai/ dans votre navigateur.",
-      "Créez un compte avec votre email ou connectez-vous avec Google.",
-      "Dans le menu latéral, cliquez sur « API Keys » (Clés API).",
-      "Cliquez sur « Create new key » (Créer une nouvelle clé) en haut à droite.",
-      "Donnez un nom explicite à votre clé (ex : « GradeAssist »).",
-      "Définissez une date d'expiration (optionnel) et cliquez sur « Create ».",
-      "Copiez immédiatement la clé affichée — elle ne sera plus jamais affichée ensuite !",
-      "Collez la clé dans le champ « Clé API Mistral AI » de l'onglet Informations Générales.",
-      "La clé est stockée localement dans votre navigateur (jamais envoyée à un serveur).",
-      "💡 Le plan gratuit offre 1 million de tokens/mois — largement suffisant pour un usage universitaire.",
+      "GradeAssist supporte plusieurs fournisseurs IA : choisissez celui de votre choix dans Informations Générales → Assistant IA.",
+      "🟢 RoutesMe (recommandé) : ouvrez https://routesme.online/, créez un compte et copiez votre clé API gratuite — accès gratuit avec quota quotidien, API compatible OpenAI.",
+      "🟢 Groq Cloud : ouvrez https://console.groq.com/keys, connectez-vous (compte gratuit), cliquez sur « Create API Key », nommez-la (ex : « GradeAssist ») et copiez la clé — gratuit et très rapide.",
+      "🟢 Google Gemini : ouvrez https://aistudio.google.com/apikey, connectez-vous avec votre compte Google, cliquez sur « Create API key » et copiez la clé — quota gratuit généreux.",
+      "Collez la clé dans le champ « Clé API » de la section Assistant IA (le lien vers la page de création s'affiche sous le champ).",
+      "Le nom du modèle se remplit automatiquement — vous pouvez le personnaliser si votre fournisseur utilise un autre modèle.",
+      "La clé est stockée localement dans votre navigateur (elle n'est utilisée que côté serveur pour appeler le fournisseur choisi, jamais stockée ailleurs).",
+      "💡 RoutesMe et Groq offrent un accès gratuit quotidien — largement suffisant pour un usage universitaire.",
     ],
   },
   {
@@ -280,7 +278,7 @@ export function HelpGuideDialog() {
               </li>
               <li className="flex items-start gap-2">
                 <span>•</span>
-                <span>L&apos;<strong>Assistant IA</strong> génère des commentaires et analyses contextuelles — configurez votre clé Mistral AI dans Informations pour l&apos;activer.</span>
+                <span>L&apos;<strong>Assistant IA</strong> génère des commentaires et analyses contextuelles — choisissez un fournisseur (RoutesMe, Groq…) et collez votre clé API dans Informations pour l&apos;activer.</span>
               </li>
             </ul>
           </div>

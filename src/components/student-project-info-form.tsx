@@ -10,8 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, PlusCircle, MinusCircle, ImageUp, XCircle, UserPlus, UserMinus, Mail, KeyRound } from "lucide-react";
+import { Upload, PlusCircle, MinusCircle, ImageUp, XCircle, UserPlus, UserMinus, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { AiProviderSettings } from "@/components/ai-provider-settings";
 
 interface StudentProjectInfoFormProps {
   studentNames: string[];
@@ -489,32 +490,7 @@ export function StudentProjectInfoForm({
           </p>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="mistralApiKey">Clé API Mistral AI</Label>
-          <div className="relative">
-            <Input
-              id="mistralApiKey"
-              type="password"
-              defaultValue={typeof window !== 'undefined' ? localStorage.getItem('gradeAssist_mistralApiKey') || '' : ''}
-              onChange={(e) => {
-                localStorage.setItem('gradeAssist_mistralApiKey', e.target.value);
-              }}
-              placeholder="Collez votre clé API Mistral ici (optionnel)"
-              className="pl-9"
-            />
-            <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          </div>
-          <p className="text-[11px] text-muted-foreground">
-            Clé API personnelle pour activer l&apos;assistant IA (Mistral AI). Obtenez-la sur{" "}
-            <a href="https://console.mistral.ai" target="_blank" rel="noopener noreferrer" className="text-accent underline">
-              console.mistral.ai
-            </a>.
-            <br />
-            <span className="text-muted-foreground/70">
-              Si vous n&apos;en configurez pas, l&apos;administrateur peut fournir une clé serveur partagée (MISTRAL_API_KEY).
-            </span>
-          </p>
-        </div>
+        <AiProviderSettings />
 
         <div className="space-y-2">
           <Label htmlFor="projectName">Intitulé du Projet</Label>

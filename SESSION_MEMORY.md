@@ -53,9 +53,31 @@
 - **Prérequis build Android local** : Java 21 OK, SDK Android absent (ANDROID_HOME vide) → le build se fait en CI.
 - **Prérequis pour upgrader depuis l'APK 2.9.6 (signé debug)** : désinstaller l'ancienne version avant d'installer la nouvelle (signature différente) ; à partir de 2.9.9, les mises à jour suivantes s'installent par-dessus.
 - `npx cap sync android` (script `cap:sync`) à relancer si la config Capacitor change.
+- **Résultat** : release v2.9.9 publiée le 28/09/2026 après 3 itérations CI — `GradeAssist-2.9.9.apk` (3 Mo, config Vercel embarquée vérifiée, signature release) + `GradeAssist.Setup.2.9.9.exe` (80 Mo). Échecs corrigés : `android-actions/setup-android` (paquet `tools` supprimé → retiré), `capacitor-cordova-android-plugins` absent du checkout (→ step `npx cap sync android` avant gradlew), CLI Capacitor 8 exige Node ≥ 22 (→ job android sur Node 22).
+- **Aperçu PDF Canevas : ✅ confirmé fonctionnel par l'utilisateur** (28 septembre 2026) — les 3 couches de correctifs (081fe29, abe51f7, cfacc5a) sont validées en production.
 
 ### F. Analyse SDK tiers (demandes d'analyse de dépôt)
 - **strands-agents/harness-sdk** : SDK agents IA (TS/Python), model-agnostique, tools, MCP, guardrails, streaming. Recommandation : ne l'adopter que pour transformer l'assistant en agent avec tools ; sinon rester sur le fetch Mistral actuel.
+
+### G. Assistant IA BYOK multi-fournisseurs (1er octobre 2026, en attente validation utilisateur)
+- **Contexte** : le tier gratuit Mistral n'est plus disponible → l'ajout d'une clé Mistral gratuite ne fonctionne plus. Demande utilisateur : proposer une liste de fournisseurs connus + ceux qui donnent des accès gratuits, dont https://routesme.online/ (API compatible OpenAI, base `https://routesme.online/v1`, clé gratuite avec quota quotidien, Model ID exemple `GLM5.2R` — non vérifié par appel API réel ; champ modèle optionnel laisse l'utilisateur corriger).
+- **Architecture BYOK (Bring Your Own Key)** : registre statique de 6 providers dans le code ; URL upstream TOUJOURS résolue côté serveur depuis le registre (anti-SSRF, jamais acceptée du client) ; clé utilisateur en localStorage ; modèle client nettoyé par whitelist regex.
+- **Fichiers** :
+  - `src/lib/ai-providers.ts` (NOUVEAU) : interface `AiProvider`, registre `AI_PROVIDERS` = routesme (défaut, Gratuit), groq (`llama-3.1-8b-instant`, Gratuit, console.groq.com/keys), openrouter (`openrouter/auto`, modèles :free), gemini (`gemini-2.0-flash`, Gratuit, endpoint OpenAI-compat), openai (`gpt-4o-mini`), mistral (`mistral-small-latest`, payant). `AI_STORAGE_KEYS` = `{gradeAssist_aiApiKey, gradeAssist_aiProvider, gradeAssist_aiModel}` ; `LEGACY_MISTRAL_KEY` = `gradeAssist_mistralApiKey` ; `getAiProvider(id)` fallback routesme.
+  - `src/lib/ai-proxy.ts` (NOUVEAU) : `handleAiChat(body)` — validation (≤50 messages, ≤8000 car., rôles whitelistés), clé ≥8 car. sinon 401 FR, `sanitizeModel`, fetch POST `Authorization: Bearer`, temp défaut 0.2, erreurs FR mappées (401/403 clé, 404 modèle, 429 quota, 402 crédit→suggérer RoutesMe/Groq/Gemini, 5xx), réponse `{content, provider, model}`.
+  - `src/app/api/ai/route.ts` (NOUVEAU) : POST → `handleAiChat`.
+  - `src/app/api/mistral/route.ts` (RÉÉCRIT) : shim compat → force `providerId:"mistral"`, ancien contrat `{messages, apiKey?, model?}` conservé (fallback serveur `MISTRAL_API_KEY` supprimé).
+  - `src/components/ai-provider-settings.tsx` (NOUVEAU) : Select provider avec badges « Gratuit », Input password clé + lien docsUrl, Input modèle optionnel, persistance localStorage, migration ancienne clé mistral, badge « Clé enregistrée ».
+  - `src/components/ai-assistant.tsx` (MODIFIÉ) : fetch `/api/ai` avec `{messages, providerId, apiKey, model?}`, lecture localStorage à chaque envoi, garde sans clé (message FR), erreurs paramétrées par `providerName`, titre dialog « Assistant IA ».
+  - `src/components/student-project-info-form.tsx` (MODIFIÉ) : `<AiProviderSettings />` remplace le champ clé Mistral.
+  - `src/components/help-guide-dialog.tsx` (MODIFIÉ) : section « Assistant IA (multi-fournisseurs) » + section « Obtenir une clé API IA (gratuit) » décrivant RoutesMe/Groq/Gemini ; toutes les mentions Mistral génériques remplacées.
+- **CSP** : aucun changement `next.config.ts` nécessaire — le proxy serveur `/api/ai` appelle les providers, pas le navigateur.
+- **Typecheck** : `bun run typecheck` ✅ (1er octobre 2026). Grep de régression ✅ : plus aucune utilisation client de `/api/mistral` ni de la clé legacy (seuls le shim et la constante de migration restent).
+- **Validé en direct avec la clé utilisateur** (1er octobre 2026) : GET `/v1/models` → HTTP 200 (20 modèles listés) ; POST `/chat/completions` avec la clé via proxy `/api/ai` → HTTP 200, réponse FR correcte (`{"content":"Un enseignant universitaire a pour rôle d'enseigner…","provider":"routesme","model":"LING-3.0-Flash"}`). Garde 401 sans clé vérifiée. `bun run typecheck` ✅.
+- **Modèle RoutesMe** : `GLM5.2R` indisponible (503 `all_keys_failed` — backends saturés, confirmé aussi sur AUTO-R, GLM5.3-flash, Kimi-k3, DeepSeek, Step-3.7) ; un 429 `rate_limited` réel prouve que la clé atteint bien le backend. **Modèle par défaut changé → `LING-3.0-Flash`** (seul modèle qui a répondu ; les modèles 503 reviendront probablement plus tard — l'utilisateur peut toujours en choisir un autre dans le champ modèle).
+- **Durcissement proxy** : une relance automatique (pause 1,2 s) pour les 502/503/504 transitoires dans `src/lib/ai-proxy.ts`.
+- **Sécurité** : la clé utilisateur a transité dans des commandes curl de test — l'utilisateur devrait la régénérer depuis routesme.online si le souhaité ; elle n'est jamais loggée par le code.
+- **Commit** : à faire sur validation explicite de l'utilisateur (pas encore demandé).
 
 ---
 

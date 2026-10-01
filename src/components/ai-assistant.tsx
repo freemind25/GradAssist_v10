@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { AI_STORAGE_KEYS, getAiProvider } from "@/lib/ai-providers";
 import type { EvaluationData } from "@/types";
 
 interface ChatMessage {
@@ -234,12 +235,27 @@ export function AiAssistant({ evaluationData, moduleName, moduleType }: AiAssist
     async (userMessage: string) => {
       if (!userMessage.trim() || isLoading) return;
 
-      // [SEC-01] Approche hybride :
-      // - Si l'utilisateur a configuré sa propre clé Mistral → on l'envoie dans le body
-      // - Si pas de clé utilisateur → la route /api/mistral utilise la clé serveur (env var)
+      // [SEC-01] Approche BYOK multi-fournisseurs :
+      // - L'utilisateur choisit un fournisseur + colle sa clé (localStorage)
+      // - Les deux sont envoyés au proxy /api/ai (URL résolue côté serveur)
       const apiKey = typeof window !== "undefined"
-        ? localStorage.getItem("gradeAssist_mistralApiKey")
+        ? localStorage.getItem(AI_STORAGE_KEYS.apiKey)
         : null;
+      const providerId = typeof window !== "undefined"
+        ? localStorage.getItem(AI_STORAGE_KEYS.provider)
+        : null;
+      const model = typeof window !== "undefined"
+        ? localStorage.getItem(AI_STORAGE_KEYS.model)
+        : null;
+      const providerName = getAiProvider(providerId).name;
+
+      if (!apiKey) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: "❌ Aucune clé IA configurée. Ouvrez ⚙️ Informations Générales → Assistant IA, choisissez un fournisseur (RoutesMe, Groq et Gemini proposent des accès gratuits) et collez votre clé." },
+        ]);
+        return;
+      }
 
       const userMsg: ChatMessage = { role: "user", content: userMessage };
       setMessages((prev) => [...prev, userMsg]);
@@ -268,7 +284,7 @@ Le système de notation est sur /20. Les mentions sont : Très Bien (≥16), Bie
 Utilise ce contexte pour donner des réponses pertinentes et personnalisées. Si des données manquent, indique-le clairement et propose des exemples génériques adaptés au contexte universitaire algérien.`;
 
       try {
-        const res = await fetch("/api/mistral", {
+        const res = await fetch("/api/ai", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -277,8 +293,9 @@ Utilise ce contexte pour donner des réponses pertinentes et personnalisées. Si
               ...messages.map((m) => ({ role: m.role, content: m.content })),
               { role: "user", content: userMessage },
             ],
-            // [SEC-01] Envoi de la clé utilisateur si elle existe (fallback serveur sinon)
-            ...(apiKey ? { apiKey } : {}),
+            providerId,
+            apiKey,
+            ...(model ? { model } : {}),
           }),
         });
 
@@ -290,14 +307,10 @@ Utilise ce contexte pour donner des réponses pertinentes et personnalisées. Si
           } catch {
             // non-JSON response
           }
-          if (res.status === 503) {
-            errorMsg = "Service IA temporairement indisponible (clé API non configurée côté serveur). Contactez l'administrateur.";
-          } else if (res.status === 429) {
-            errorMsg = "Trop de requêtes. Patientez quelques secondes.";
+          if (res.status === 429) {
+            errorMsg = `Quota ${providerName} atteint. Patientez quelques secondes ou changez de fournisseur.`;
           } else if (res.status === 401 || res.status === 403) {
-            errorMsg = "Erreur d'authentification serveur (clé Mistral invalide). Contactez l'administrateur.";
-          } else if (res.status === 502 || res.status === 503 || res.status === 504) {
-            errorMsg = "Le serveur est temporairement indisponible. Réessayez dans quelques secondes.";
+            errorMsg = `Clé ${providerName} invalide. Vérifiez-la dans ⚙️ Informations Générales → Assistant IA.`;
           }
           setMessages((prev) => [
             ...prev,
@@ -325,6 +338,7 @@ Utilise ce contexte pour donner des réponses pertinentes et personnalisées. Si
     },
     [isLoading, messages, buildContext]
   );
+  // providerId/model/apiKey relus à chaque envoi depuis localStorage
 
   const handleQuickAction = (action: (typeof QUICK_ACTIONS)[number]) => {
     const fullPrompt = `${action.prompt}\n\nModule: ${moduleName}. Utilise toutes les données disponibles pour une réponse détaillée.`;
@@ -347,7 +361,7 @@ Utilise ce contexte pour donner des réponses pertinentes et personnalisées. Si
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-accent" />
-            Assistant IA — Mistral AI
+            Assistant IA
             <Badge variant="outline" className="text-[10px] font-normal ml-auto">
               {moduleName}
             </Badge>
