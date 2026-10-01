@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Installer GradeAssist sur Android — Guide</title>
+  <style>
+    :root { --ink:#0f172a; --muted:#64748b; --card:#ffffff; --bg:#f1f5f9; --accent:#1d4ed8; --ok:#047857; --warn:#b45309; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--ink); line-height:1.6; }
+    .wrap { max-width:760px; margin:0 auto; padding:24px 16px 64px; }
+    header { text-align:center; padding:24px 0 8px; }
+    header h1 { font-size:1.6rem; margin:.2em 0; }
+    header p { color:var(--muted); margin:.2em 0 0; }
+    .card { background:var(--card); border:1px solid #e2e8f0; border-radius:14px; padding:20px 22px; margin:18px 0; box-shadow:0 1px 2px rgba(15,23,42,.05); }
+    h2 { font-size:1.1rem; margin:0 0 12px; display:flex; align-items:center; gap:8px; }
+    ol { padding-left:1.2em; margin:0; }
+    ol li { margin:8px 0; }
+    .step { display:flex; gap:12px; margin:10px 0; align-items:flex-start; }
+    .step .n { flex:0 0 26px; height:26px; border-radius:50%; background:var(--accent); color:#fff; font-weight:700; font-size:.85rem; display:flex; align-items:center; justify-content:center; margin-top:2px; }
+    code, .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.9em; background:#eef2ff; border-radius:6px; padding:1px 6px; }
+    .note { border-left:4px solid var(--ok); background:#ecfdf5; padding:10px 14px; border-radius:8px; margin:12px 0; }
+    .warn { border-left:4px solid var(--warn); background:#fffbeb; padding:10px 14px; border-radius:8px; margin:12px 0; }
+    .btn { display:inline-block; background:var(--accent); color:#fff; text-decoration:none; font-weight:600; padding:12px 22px; border-radius:10px; margin-top:6px; }
+    .btn:hover { filter:brightness(1.1); }
+    .center { text-align:center; }
+    footer { color:var(--muted); font-size:.85rem; text-align:center; margin-top:28px; }
+    details { margin:8px 0; }
+    summary { cursor:pointer; font-weight:600; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div style="font-size:2rem">🎓</div>
+      <h1>Installer GradeAssist sur Android</h1>
+      <p>Guide officiel — aucune application « installateur d'APK » n'est nécessaire.</p>
+    </header>
+
+    <div class="card">
+      <h2>📥 1. Télécharger</h2>
+      <p>Téléchargez le fichier <code>GradeAssist-2.9.10.apk</code> depuis la page des releases GitHub, puis ouvrez-le directement depuis la notification de téléchargement ou l'application « Fichiers » → « Téléchargements ».</p>
+      <p class="center">
+        <a class="btn" href="https://github.com/freemind25/GradAssist_v10/releases/latest">Ouvrir la page des releases</a>
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>🛠️ 2. Installer (2 réglages maximum)</h2>
+      <div class="step"><span class="n">1</span><div>Appuyez sur l'APK téléchargé. Android affiche : <em>« Pour votre sécurité, votre téléphone n'est pas autorisé à installer des applications inconnues de cette source »</em>.</div></div>
+      <div class="step"><span class="n">2</span><div>Appuyez sur <strong>Paramètres</strong> dans ce message, puis activez <strong>« Autoriser depuis cette source »</strong> pour l'application qui a ouvert le fichier (navigateur ou « Fichiers »). C'est un réglage propre à cette seule source — Android n'autorise rien d'autre.</div></div>
+      <div class="step"><span class="n">3</span><div>Revenez en arrière puis appuyez sur <strong>Installer</strong>.</div></div>
+      <div class="step"><span class="n">4</span><div>Ouvrez GradeAssist : l'application charge la même version que le site <code>grad-assist-v10.vercel.app</code>. Connectez-vous et vos données synchronisées apparaissent.</div></div>
+      <div class="note">💡 <strong>Pas besoin de programme d'installation.</strong> Contrairement à Windows (.exe), Android sait installer un <code>.apk</code> tout seul — les « installateurs APK » du Play Store ne font qu'envelopper ce réglage de sécurité. Votre téléphone a tout ce qu'il faut.</div>
+    </div>
+
+    <div class="card">
+      <h2>🛡️ 3. Play Protect — pourquoi l'avertissement ?</h2>
+      <p>Si Google Play Protect affiche <em>« Application non installée / Application inconnue »</em> après l'installation :</p>
+      <div class="step"><span class="n">1</span><div>Appuyez sur <strong>« Plus de détails »</strong> dans la fenêtre Play Protect.</div></div>
+      <div class="step"><span class="n">2</span><div>Appuyez sur <strong>« Installer quand même »</strong>.</div></div>
+      <div class="warn">ℹ️ Cet avertissement apparaît systématiquement pour toute application distribuée hors Play Store, même inoffensive. GradeAssist est signé par le même certificat de release depuis la v2.9.9 et ne demande <strong>aucune autorisation sensible</strong> (pas de contacts, SMS, localisation ni stockage) : c'est une WebView sécurisée vers le site officiel.</div>
+      <details>
+        <summary>Vérifier l'empreinte de l'APK (optionnel, pour les utilisateurs avancés)</summary>
+        <p>L'empreinte SHA-256 officielle est publiée dans les notes de chaque release GitHub. Sur PC : <code>certutil -hashfile GradeAssist-2.9.10.apk SHA256</code> (Windows) ou <code>shasum -a 256 GradeAssist-2.9.10.apk</code> (Mac/Linux). Si les empreintes correspondent, le fichier est authentique.</p>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>🔄 4. Mettre à jour / réinstaller</h2>
+      <ol>
+        <li><strong>Mise à jour depuis la v2.9.9</strong> : installez simplement la nouvelle APK par-dessus (même signature) — vos données locales sont conservées.</li>
+        <li><strong>Depuis la v2.9.6 ou antérieure</strong> (signature différente) : désinstallez d'abord l'ancienne version, puis installez la nouvelle.</li>
+        <li><strong>« Application non installée »</strong> : vérifiez l'espace libre (≈ 200 Mo) et que vous avez téléchargé l'APK complet (≈ 3 Mo).</li>
+      </ol>
+    </div>
+
+    <footer>GradeAssist v10 — Application d'évaluation académique · Conçu par M.SADI<br/>En cas de difficulté, consultez la notice « Aide » intégrée à l'application.</footer>
+  </div>
+</body>
+</html>
