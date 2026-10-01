@@ -1,6 +1,6 @@
 {
   "name": "gradeassist",
-  "version": "2.9.9",
+  "version": "2.9.10",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
