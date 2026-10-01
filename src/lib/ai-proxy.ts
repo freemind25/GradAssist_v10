@@ -8,8 +8,10 @@ import { AI_PROVIDERS, getAiProvider } from "@/lib/ai-providers";
 //   (jamais acceptée du client) → pas de rebond SSRF vers une URL arbitraire
 // - Le modèle est accepté du client mais nettoyé (whitelist de caractères)
 
-const MAX_MESSAGES = 50;   // [SEC-10] Limite anti-abus
-const MAX_CONTENT = 8000;
+const MAX_MESSAGES = 100;         // [SEC-10] Limite anti-abus
+// Le prompt système embarque tout le contexte du module (étudiants, présences,
+// canevas…) : il dépasse couramment 10 000 caractères → limite haute requise.
+const MAX_CONTENT = 200_000;
 
 interface AiChatMessage {
   role: "user" | "assistant" | "system";

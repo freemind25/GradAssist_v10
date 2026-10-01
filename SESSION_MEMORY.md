@@ -86,6 +86,10 @@
 - **Question utilisateur « installateur APK »** : pas d'installeur possible — Android gère les APK nativement ; les apps « installateur APK » ne font qu'envelopper le réglage « Autoriser depuis cette source ». Réponse : **`public/installer-android.html`** (guide autonome, vérifié HTTP 200 sur https://grad-assist-v10.vercel.app/installer-android.html) + section installation dans les notes de release (SHA-256, Play Protect « Plus de détails → Installer quand même », maj depuis 2.9.9 par-dessus / depuis 2.9.6 désinstallation requise).
 - Notes de release enrichies (tableau fournisseurs + guide installation + SHA-256).
 
+### I. Fix « Requête invalide » + bouton « Tester la clé » (1er octobre 2026)
+- **Bug signalé par l'utilisateur** (test RoutesMe en production) : « Requête invalide : messages manquants ou malformés » → cause : `MAX_CONTENT = 8000` dans `ai-proxy.ts`, dépassé par le prompt système dès qu'un module contient des données réelles (contexte complet des étudiants/présences/canevas). **Fix : `MAX_CONTENT = 200_000` + `MAX_MESSAGES = 100`.** Validé en preview : contexte de 23 524 caractères → HTTP 200 (modèle LING-3.0-Flash, comptage exact des 200 étudiants du test).
+- **Bouton « Tester la clé »** ajouté dans `ai-provider-settings.tsx` : vraie requête via `/api/ai` (system + user courts), spinner, résultat vert (avec snippet de réponse + modèle) / rouge (message d'erreur FR du fournisseur). Se déclenche aussi utilement après changement de modèle.
+
 ---
 
 ## 3. Conventions de travail établies
