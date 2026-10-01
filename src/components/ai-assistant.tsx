@@ -293,7 +293,10 @@ Utilise ce contexte pour donner des réponses pertinentes et personnalisées. Si
               ...messages.map((m) => ({ role: m.role, content: m.content })),
               { role: "user", content: userMessage },
             ],
-            providerId,
+            // providerId/model sont absents de localStorage tant que
+            // l'utilisateur n'a pas touché au sélecteur : ne jamais envoyer null
+            // (le serveur retombe alors sur le fournisseur par défaut).
+            ...(providerId ? { providerId } : {}),
             apiKey,
             ...(model ? { model } : {}),
           }),

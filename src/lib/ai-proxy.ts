@@ -37,7 +37,7 @@ function isValidBody(body: unknown): body is AiChatRequestBody {
     if (!["user", "assistant", "system"].includes(m.role as string)) return false;
     if (typeof m.content !== "string" || m.content.length > MAX_CONTENT) return false;
   }
-  if (b.providerId !== undefined && typeof b.providerId !== "string") return false;
+  if (b.providerId != null && typeof b.providerId !== "string") return false;
   if (b.apiKey !== undefined && typeof b.apiKey !== "string") return false;
   if (b.model !== undefined && typeof b.model !== "string") return false;
   return true;
