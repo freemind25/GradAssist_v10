@@ -77,7 +77,14 @@
 - **Modèle RoutesMe** : `GLM5.2R` indisponible (503 `all_keys_failed` — backends saturés, confirmé aussi sur AUTO-R, GLM5.3-flash, Kimi-k3, DeepSeek, Step-3.7) ; un 429 `rate_limited` réel prouve que la clé atteint bien le backend. **Modèle par défaut changé → `LING-3.0-Flash`** (seul modèle qui a répondu ; les modèles 503 reviendront probablement plus tard — l'utilisateur peut toujours en choisir un autre dans le champ modèle).
 - **Durcissement proxy** : une relance automatique (pause 1,2 s) pour les 502/503/504 transitoires dans `src/lib/ai-proxy.ts`.
 - **Sécurité** : la clé utilisateur a transité dans des commandes curl de test — l'utilisateur devrait la régénérer depuis routesme.online si le souhaité ; elle n'est jamais loggée par le code.
-- **Commit** : à faire sur validation explicite de l'utilisateur (pas encore demandé).
+- **Commit** : `9b3f373` (fonctionnalité BYOK) + `acb85eb` (release v2.9.10 + guide), poussés sur main → déploiement Vercel auto.
+
+### H. Release v2.9.10 (1er octobre 2026) — ✅ publiée
+- **Tag `v2.9.10`** → CI verte (build-android, build-windows, release). Assets : `GradeAssist-2.9.10.apk` (3,2 Mo) + `GradeAssist.Setup.2.9.10.exe` (80 Mo).
+- **versionCode 3 / versionName 2.9.10** (android/app/build.gradle), package.json 2.9.10.
+- **SHA-256 APK** : `2d841b3eac0b8f20cceb7e45e57e0ea29ddcd9f83adefac5a01175e140f86f4e` (publié dans les notes de release).
+- **Question utilisateur « installateur APK »** : pas d'installeur possible — Android gère les APK nativement ; les apps « installateur APK » ne font qu'envelopper le réglage « Autoriser depuis cette source ». Réponse : **`public/installer-android.html`** (guide autonome, vérifié HTTP 200 sur https://grad-assist-v10.vercel.app/installer-android.html) + section installation dans les notes de release (SHA-256, Play Protect « Plus de détails → Installer quand même », maj depuis 2.9.9 par-dessus / depuis 2.9.6 désinstallation requise).
+- Notes de release enrichies (tableau fournisseurs + guide installation + SHA-256).
 
 ---
 
