@@ -89,7 +89,14 @@
 ### I. Fix « Requête invalide » + bouton « Tester la clé » (1er octobre 2026)
 - **Bug signalé par l'utilisateur** (test RoutesMe en production) : « Requête invalide : messages manquants ou malformés » → cause : `MAX_CONTENT = 8000` dans `ai-proxy.ts`, dépassé par le prompt système dès qu'un module contient des données réelles (contexte complet des étudiants/présences/canevas). **Fix : `MAX_CONTENT = 200_000` + `MAX_MESSAGES = 100`.** Validé en preview : contexte de 23 524 caractères → HTTP 200 (modèle LING-3.0-Flash, comptage exact des 200 étudiants du test).
 - **Bouton « Tester la clé »** ajouté dans `ai-provider-settings.tsx` : vraie requête via `/api/ai` (system + user courts), spinner, résultat vert (avec snippet de réponse + modèle) / rouge (message d'erreur FR du fournisseur). Se déclenche aussi utilement après changement de modèle.
-- **2e bug signalé** (test vert mais assistant en erreur) : `providerId: null` envoyé par `ai-assistant.tsx` quand localStorage ne contient pas de fournisseur (l'utilisateur n'a jamais re-sélectionné « RoutesMe » dans le Select, affiché par défaut) → rejet 400 par le validateur strict. **Fix double** : (1) client — ne plus inclure `providerId`/`model` dans le body s'ils sont null ; (2) serveur — `providerId != null` au lieu de `!== undefined` dans `isValidBody`. Validé : sans providerId + 3 863 car. → HTTP 200. Commits `aad1feb` (limite 200k + bouton test) et le commit présent, poussés sur main.
+- **2e bug signalé** (test vert mais assistant en erreur) : `providerId: null` envoyé par `ai-assistant.tsx` quand localStorage ne contient pas de fournisseur (l'utilisateur n'a jamais re-sélectionné « RoutesMe » dans le Select, affiché par défaut) → rejet 400 par le validateur strict. **Fix double** : (1) client — ne plus inclure `providerId`/`model` dans le body s'ils sont null ; (2) serveur — `providerId != null` au lieu de `!== undefined` dans `isValidBody`. Validé : sans providerId + 3 863 car. → HTTP 200. Commits `aad1feb` (limite 200k + bouton test) et `1f9e9bb`, poussés sur main.
+- **✅ Confirmé fonctionnel par l'utilisateur** (« ça marche ! ») — assistant IA RoutesMe opérationnel en production (1er octobre 2026).
+
+### J. Release v2.9.11 (1er octobre 2026) — ✅ publiée
+- Déclencheur : alignement des installateurs avec l'état final du code (l'utilisateur a validé ; fonctionnellement les anciens APK/exe suffisaient car l'app charge Vercel en ligne).
+- Commits `92f44aa` (bump versionCode 4 / 2.9.11) + tag `v2.9.11` → CI verte (3 jobs). Assets : `GradeAssist-2.9.11.apk` (3,2 Mo) + `GradeAssist.Setup.2.9.11.exe` (80 Mo).
+- **SHA-256 APK** : `95f4e5c9dfb55e3681b88b6fe813832bf5a95dc3e986b5218918cdd878fbbf15` (dans les notes).
+- Notes enrichies : tableau fournisseurs BYOK, bouton « Tester la clé », guide installation Android, compatibilité mises à jour 2.9.9/2.9.10 → par-dessus.
 
 ---
 
