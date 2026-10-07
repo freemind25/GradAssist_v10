@@ -1,7 +1,14 @@
-<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="192" height="192" rx="40" fill="#0f172a"/>
-  <rect x="2" y="2" width="188" height="188" rx="38" stroke="#d97706" stroke-width="4" fill="none"/>
-  <g transform="translate(40, 32)">
-    <path d="M56 4L4 52L20 60V104L56 128L112 72V28L100 22M56 4L112 52L56 100L4 52M88 112L56 136V100L88 68V112Z" stroke="#d97706" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<svg width="192" height="192" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgA192" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbbf24"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="44" fill="url(#bgA192)"/>
+  <g transform="translate(53, 35)" fill="#ffffff">
+    <path d="M70,14L38,46C38,46 50,50 56,52C62,54 66,55 70,56C74,57 77,57 80,57C83,57 85,58 86,59L38,100L36,108L76,104C90,100 90,92 80,80C74,74 66,68 60,65C54,62 50,60 46,58L50,52Z"/>
+    <path d="M70,30L46,56C46,56 55,59 61,61C66,63 70,63 74,63C77,63 79,63 81,62C83,61 85,60 87,59L46,98L44,108L88,104C102,100 102,92 92,80C84,72 74,64 66,60C58,56 54,55 50,53L54,47Z"/>
+    <path d="M75,38L54,60C54,60 63,62 68,63C73,64 76,64 79,64C81,64 83,64 85,63C87,62 89,60 91,59L54,96L52,108L96,104C110,100 110,92 100,80C92,72 82,64 74,60C66,56 62,54 58,53L62,47Z"/>
   </g>
 </svg>
