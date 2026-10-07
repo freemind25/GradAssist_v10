@@ -178,8 +178,7 @@ export function AiProviderSettings() {
           <Select value={providerId} onValueChange={handleProviderChange}>
             <SelectTrigger aria-label="Fournisseur IA">
               <SelectValue placeholder="Choisir un fournisseur" />
-            </SelectTrigger>
-            <SelectContent>
+            </SelectTrigger>            <SelectContent>
               {AI_PROVIDERS.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   <span className="flex items-center gap-2">
