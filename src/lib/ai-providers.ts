@@ -75,9 +75,32 @@ export const AI_PROVIDERS: AiProvider[] = [
     description:
       "La Plateforme Mistral (ancien tier gratuit retiré ; fonctionnel avec une clé payante).",
   },
+  {
+    id: "codecraft",
+    name: "CodeCraft AI",
+    baseUrl: "https://api.craftapi.com/v1/chat/completions",
+    docsUrl: "https://www.craftapi.com/dashboard/get-started",
+    defaultModel: "gpt-4o-mini",
+    freeBadge: "1M tokens/mois",
+    description:
+      "Endpoint OpenAI-compatible (chat/completions) avec clé API personnalisée. Niveau gratuit 1M tokens/mois selon votre offre.",
+  },
 ];
 
 export const DEFAULT_AI_PROVIDER_ID = AI_PROVIDERS[0].id;
+
+// Quand un utilisateur n'a pas choisi de fournisseur mais qu'une clé est déjà
+// enregistrée pour un fournisseur donné, on retombe sur ce fournisseur (et non
+// systématiquement sur RoutesMe), pour éviter d'envoyer providerId: null à /api/ai.
+export function getDefaultProviderIdWithKey(
+  savedProviderId: string | null | undefined,
+  savedApiKey: string | null | undefined,
+): string {
+  if (savedProviderId && savedApiKey && savedApiKey.length >= 8) {
+    return savedProviderId;
+  }
+  return DEFAULT_AI_PROVIDER_ID;
+}
 
 export function getAiProvider(id: string | undefined | null): AiProvider {
   return (

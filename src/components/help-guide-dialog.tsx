@@ -161,6 +161,7 @@ const sections = [
       "🟢 RoutesMe (recommandé) : ouvrez https://routesme.online/, créez un compte et copiez votre clé API gratuite — accès gratuit avec quota quotidien, API compatible OpenAI.",
       "🟢 Groq Cloud : ouvrez https://console.groq.com/keys, connectez-vous (compte gratuit), cliquez sur « Create API Key », nommez-la (ex : « GradeAssist ») et copiez la clé — gratuit et très rapide.",
       "🟢 Google Gemini : ouvrez https://aistudio.google.com/apikey, connectez-vous avec votre compte Google, cliquez sur « Create API key » et copiez la clé — quota gratuit généreux.",
+      "🟡 CodeCraft AI : ouvrez https://www.craftapi.com/dashboard/get-started, créez un compte et copiez votre clé API — endpoint compatible OpenAI (chat/completions), niveau gratuit 1M tokens/mois selon votre offre (à vérifier dans votre espace dashboard CodeCraft).",
       "Collez la clé dans le champ « Clé API » de la section Assistant IA (le lien vers la page de création s'affiche sous le champ).",
       "Le nom du modèle se remplit automatiquement — vous pouvez le personnaliser si votre fournisseur utilise un autre modèle.",
       "La clé est stockée localement dans votre navigateur (elle n'est utilisée que côté serveur pour appeler le fournisseur choisi, jamais stockée ailleurs).",

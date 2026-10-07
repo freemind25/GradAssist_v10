@@ -5,6 +5,7 @@ import type * as React from 'react';
 import { useRef } from 'react';
 import Image from 'next/image';
 import * as XLSX from 'xlsx';
+import { extractStudentNames } from "@/lib/student-names";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -148,18 +149,10 @@ export function StudentProjectInfoForm({
            return;
         }
         
-        const extractedNames = excelRows
-          .slice(1) // Skip header row
-          .map((row: any) => {
-            if (Array.isArray(row)) {
-              const col0 = String(row[0] ?? '').trim();
-              const col1 = String(row[1] ?? '').trim();
-              if (col0 && col1) return `${col0} ${col1}`;
-              return col0 || col1;
-            }
-            return null;
-          })
-          .filter((name): name is string => name !== null && name.length > 0);
+        // Gère les tableaux avec colonnes « Nom » et « Prénom » séparées
+        // (fusion automatique), une colonne « Nom et Prénom » fusionnée,
+        // ou une colonne de noms simple. La colonne « numéro » est ignorée.
+        const extractedNames = extractStudentNames(excelRows);
 
         if (extractedNames.length === 0) {
           toast({
