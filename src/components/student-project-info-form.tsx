@@ -1,4 +1,3 @@
-
 "use client";
 
 import type * as React from 'react';
@@ -47,6 +46,45 @@ interface StudentProjectInfoFormProps {
 const MAX_TEACHERS = 3;
 const PLACEHOLDER_SESSION_VALUE = "__SELECT_LEVEL_FIRST__";
 
+function resolveStudyLevelMeta(studyLevel: string) {
+  const currentStudyLevel = studyLevel === "classique" ? "classique" : studyLevel;
+
+  const meta = {
+    availableSessions: [] as string[],
+    availableSubLevels: [] as { value: string; label: string }[],
+    showMasterSpecialty: false,
+  };
+
+  if (currentStudyLevel === "classique") {
+    meta.availableSessions = [];
+    meta.availableSubLevels = [
+      { value: "1ère année", label: "1ère année" },
+      { value: "2ème année", label: "2ème année" },
+      { value: "3ème année", label: "3ème année" },
+      { value: "4ème année", label: "4ème année" },
+      { value: "5ème année", label: "5ème année" },
+    ];
+  } else if (currentStudyLevel === "Licence") {
+    meta.availableSessions = ["S1", "S2", "S3", "S4", "S5", "S6"];
+    meta.availableSubLevels = [
+      { value: "L1", label: "Licence 1 (L1)" },
+      { value: "L2", label: "Licence 2 (L2)" },
+      { value: "L3", label: "Licence 3 (L3)" },
+    ];
+  } else if (currentStudyLevel === "Master") {
+    meta.availableSessions = ["S1", "S2", "S3"];
+    meta.availableSubLevels = [
+      { value: "M1", label: "Master 1 (M1)" },
+      { value: "M2", label: "Master 2 (M2)" },
+    ];
+    meta.showMasterSpecialty = true;
+  }
+
+  return {
+    ...meta,
+    currentStudyLevel,
+  };
+}
 
 export function StudentProjectInfoForm({
   studentNames,
@@ -79,6 +117,11 @@ export function StudentProjectInfoForm({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const meta = resolveStudyLevelMeta(studyLevel);
+  const availableSessions = meta.availableSessions;
+  const availableSubLevels = meta.availableSubLevels;
+  const showMasterSpecialty = meta.showMasterSpecialty;
 
   const handleStudentNameChange = (index: number, value: string) => {
     const newNames = [...studentNames];
@@ -116,7 +159,6 @@ export function StudentProjectInfoForm({
     }
   };
 
-
   const handleFileUploadClick = () => {
     fileInputRef.current?.click();
   };
@@ -127,7 +169,7 @@ export function StudentProjectInfoForm({
       try {
         const data = await file.arrayBuffer();
         const workbook = XLSX.read(data, { type: 'array' });
-        
+
         if (workbook.SheetNames.length === 0) {
           toast({
             variant: "destructive",
@@ -140,15 +182,15 @@ export function StudentProjectInfoForm({
         const worksheet = workbook.Sheets[sheetName];
         const excelRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-        if (!Array.isArray(excelRows) || excelRows.length <= 1) { 
-           toast({
+        if (!Array.isArray(excelRows) || excelRows.length <= 1) {
+          toast({
             variant: "destructive",
             title: "Fichier Excel Vide",
             description: "Aucun nom d'étudiant trouvé dans le fichier (après l'en-tête).",
           });
-           return;
+          return;
         }
-        
+
         // Gère les tableaux avec colonnes « Nom » et « Prénom » séparées
         // (fusion automatique), une colonne « Nom et Prénom » fusionnée,
         // ou une colonne de noms simple. La colonne « numéro » est ignorée.
@@ -176,7 +218,7 @@ export function StudentProjectInfoForm({
           description: "Impossible de lire le fichier Excel.",
         });
       } finally {
-        if (fileInputRef.current) fileInputRef.current.value = ""; 
+        if (fileInputRef.current) fileInputRef.current.value = "";
       }
     }
   };
@@ -217,27 +259,11 @@ export function StudentProjectInfoForm({
     }
     if (logoInputRef.current) logoInputRef.current.value = "";
   };
-  
+
   const handleRemoveLogo = () => {
     setUniversityLogo(null);
     toast({ title: "Logo supprimé", description: "Le logo a été retiré." });
   };
-
-
-  const licenceSessions = ["S1", "S2", "S3", "S4", "S5", "S6"];
-  const masterSessions = ["S1", "S2", "S3"]; 
-  const availableSessions = studyLevel === "Licence" ? licenceSessions : studyLevel === "Master" ? masterSessions : [];
-  
-  const licenceSubLevels = [
-    { value: 'L1', label: '1ère Année (L1)' },
-    { value: 'L2', label: '2ème Année (L2)' },
-    { value: 'L3', label: '3ème Année (L3)' },
-  ];
-  const masterSubLevels = [
-    { value: 'M1', label: '1ère Année (M1)' },
-    { value: 'M2', label: '2ème Année (M2)' },
-  ];
-  const availableSubLevels = studyLevel === "Licence" ? licenceSubLevels : studyLevel === "Master" ? masterSubLevels : [];
 
   return (
     <Card className="card-premium overflow-hidden">
@@ -255,48 +281,48 @@ export function StudentProjectInfoForm({
             placeholder="Entrez le nom de l'université"
           />
         </div>
-        
+
         <div className="space-y-2">
-            <Label htmlFor="universityLogoInput">Logo de l&apos;université</Label>
-            <div className="flex items-center gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleLogoUploadClick}
-                    className="w-full"
-                >
-                    <ImageUp className="mr-2 h-4 w-4" />
-                    {universityLogo ? "Changer le logo" : "Uploader le logo"}
-                </Button>
-                <input
-                    type="file"
-                    ref={logoInputRef}
-                    onChange={handleLogoFileChange}
-                    accept="image/png, image/jpeg, image/gif"
-                    style={{ display: 'none' }}
-                />
-                {universityLogo && (
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleRemoveLogo}
-                    >
-                        <XCircle className="h-5 w-5 text-destructive" />
-                    </Button>
-                )}
-            </div>
+          <Label htmlFor="universityLogoInput">Logo de l&apos;université</Label>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleLogoUploadClick}
+              className="w-full"
+            >
+              <ImageUp className="mr-2 h-4 w-4" />
+              {universityLogo ? "Changer le logo" : "Uploader le logo"}
+            </Button>
+            <input
+              type="file"
+              ref={logoInputRef}
+              onChange={handleLogoFileChange}
+              accept="image/png, image/jpeg, image/gif"
+              style={{ display: 'none' }}
+            />
             {universityLogo && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={handleRemoveLogo}
+              >
+                <XCircle className="h-5 w-5 text-destructive" />
+              </Button>
+            )}
+          </div>
+          {universityLogo && (
             <div className="mt-2 p-2 border rounded-md flex justify-center items-center bg-muted/30 aspect-video max-h-32">
-                <Image
+              <Image
                 src={universityLogo}
                 alt="Logo"
                 width={100}
                 height={100}
                 className="object-contain rounded"
-                />
+              />
             </div>
-            )}
+          )}
         </div>
 
 
@@ -319,22 +345,23 @@ export function StudentProjectInfoForm({
             placeholder="Nom du département"
           />
         </div>
-        
+
         <div className="space-y-2">
           <Label htmlFor="studyLevel">Niveau d&apos;étude</Label>
           <Select
             value={studyLevel}
             onValueChange={(value) => {
               setStudyLevel(value);
-              setSession(""); 
+              setSession("");
               setStudySubLevel("");
-              if (value !== "Master") setMasterSpecialty(""); 
+              if (value !== "Master") setMasterSpecialty("");
             }}
           >
             <SelectTrigger id="studyLevel">
               <SelectValue placeholder="Choisir..." />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="classique">Système classique</SelectItem>
               <SelectItem value="Licence">Licence</SelectItem>
               <SelectItem value="Master">Master</SelectItem>
             </SelectContent>
@@ -361,8 +388,8 @@ export function StudentProjectInfoForm({
             </Select>
           </div>
         )}
-        
-        {studyLevel === "Master" && (
+
+        {showMasterSpecialty && (
           <div className="space-y-2">
             <Label htmlFor="masterSpecialty">Spécialité du Master</Label>
             <Input
@@ -378,79 +405,79 @@ export function StudentProjectInfoForm({
           <div className="flex items-center justify-between">
             <Label>Liste des Étudiants</Label>
             <div className="flex gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleFileUploadClick}
-                >
-                    <Upload className="mr-2 h-4 w-4" /> Importer (Excel)
-                </Button>
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    accept=".xlsx, .xls"
-                    style={{ display: "none" }}
-                />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleFileUploadClick}
+              >
+                <Upload className="mr-2 h-4 w-4" /> Importer (Excel)
+              </Button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".xlsx, .xls"
+                style={{ display: "none" }}
+              />
             </div>
           </div>
           <div className="grid gap-3">
-          {studentNames.map((name, index) => (
-            <div key={`student-${index}`} className="flex items-center gap-2">
-              <Input
+            {studentNames.map((name, index) => (
+              <div key={`student-${index}`} className="flex items-center gap-2">
+                <Input
                   value={name}
                   onChange={(e) => handleStudentNameChange(index, e.target.value)}
                   placeholder={`Nom Étudiant ${index + 1}`}
-              />
-              {studentNames.length > 1 && (
-                <Button
+                />
+                {studentNames.length > 1 && (
+                  <Button
                     type="button"
                     variant="ghost"
                     size="icon"
                     onClick={() => handleRemoveStudentField(index)}
-                >
+                  >
                     <MinusCircle className="h-5 w-5 text-destructive" />
-                </Button>
-              )}
-            </div>
-          ))}
+                  </Button>
+                )}
+              </div>
+            ))}
           </div>
-          
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleAddStudentField}
-              className="w-full sm:w-auto"
-            >
-              <PlusCircle className="mr-2 h-4 w-4" /> Ajouter un étudiant
-            </Button>
-          
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleAddStudentField}
+            className="w-full sm:w-auto"
+          >
+            <PlusCircle className="mr-2 h-4 w-4" /> Ajouter un étudiant
+          </Button>
+
         </div>
 
         <div className="md:col-span-2 space-y-4">
           <Label>Enseignants</Label>
           <div className="grid gap-3">
-          {teacherNames.map((name, index) => (
-            <div key={`teacher-${index}`} className="flex items-center gap-2">
-              <Input
+            {teacherNames.map((name, index) => (
+              <div key={`teacher-${index}`} className="flex items-center gap-2">
+                <Input
                   value={name}
                   onChange={(e) => handleTeacherNameChange(index, e.target.value)}
                   placeholder={`Nom Enseignant ${index + 1}`}
-              />
-              {teacherNames.length > 1 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleRemoveTeacherField(index)}
-                >
-                  <UserMinus className="h-5 w-5 text-destructive" />
-                </Button>
-              )}
-            </div>
-          ))}
+                />
+                {teacherNames.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleRemoveTeacherField(index)}
+                  >
+                    <UserMinus className="h-5 w-5 text-destructive" />
+                  </Button>
+                )}
+              </div>
+            ))}
           </div>
           {teacherNames.length < MAX_TEACHERS && (
             <Button
@@ -464,7 +491,7 @@ export function StudentProjectInfoForm({
             </Button>
           )}
         </div>
-        
+
         <div className="space-y-2">
           <Label htmlFor="adminEmail">Email de l&apos;administration</Label>
           <div className="relative">
@@ -520,7 +547,7 @@ export function StudentProjectInfoForm({
             </SelectContent>
           </Select>
         </div>
-        
+
         <div className="space-y-2">
           <Label htmlFor="academicYear">Année Universitaire</Label>
           <Input
