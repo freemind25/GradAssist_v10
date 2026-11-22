@@ -12,6 +12,11 @@ const MAX_MESSAGES = 100;         // [SEC-10] Limite anti-abus
 // Le prompt système embarque tout le contexte du module (étudiants, présences,
 // canevas…) : il dépasse couramment 10 000 caractères → limite haute requise.
 const MAX_CONTENT = 200_000;
+// Plafond global du corps de requête. 100 messages × 200 000 caractères
+// représentaient ~20 Mo de JSON acceptés sans authentification : un simple
+// appel suffisait à saturer la fonction. Une conversation légitime reste
+// très en dessous de ce plafond (~150 000 tokens).
+const MAX_TOTAL_CONTENT = 600_000;
 
 interface AiChatMessage {
   role: "user" | "assistant" | "system";
@@ -31,12 +36,15 @@ function isValidBody(body: unknown): body is AiChatRequestBody {
   const b = body as Record<string, unknown>;
   if (!Array.isArray(b.messages) || b.messages.length === 0) return false;
   if (b.messages.length > MAX_MESSAGES) return false;
+  let totalContent = 0;
   for (const msg of b.messages) {
     if (!msg || typeof msg !== "object") return false;
     const m = msg as Record<string, unknown>;
     if (!["user", "assistant", "system"].includes(m.role as string)) return false;
     if (typeof m.content !== "string" || m.content.length > MAX_CONTENT) return false;
+    totalContent += m.content.length;
   }
+  if (totalContent > MAX_TOTAL_CONTENT) return false;
   if (b.providerId != null && typeof b.providerId !== "string") return false;
   if (b.apiKey !== undefined && typeof b.apiKey !== "string") return false;
   if (b.model !== undefined && typeof b.model !== "string") return false;

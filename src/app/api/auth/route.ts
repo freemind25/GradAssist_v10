@@ -5,7 +5,6 @@ import {
   verifyPassword,
   generateToken,
   verifyToken,
-  getTokenFromCookies,
   COOKIE_NAME,
   getSessionCookieOptions,
   type JwtPayload,
@@ -13,10 +12,10 @@ import {
 import {
   createUser,
   getUserByEmail,
-  getUserById,
   emailExists,
   initializeDatabase,
 } from "@/lib/db";
+import { enforceApiGuard } from "@/lib/api-guard";
 
 /**
  * [SEC-04b/c] Route API d'authentification — Neon PostgreSQL + bcrypt + JWT.
@@ -34,10 +33,7 @@ function generateUserId(): string {
 export async function GET() {
   try {
     const cookieStore = await cookies();
-    const token = getTokenFromCookies(
-      cookieStore.get("cookie")?.value ??
-        cookieStore.toString()
-    ) ?? cookieStore.get(COOKIE_NAME)?.value ?? null;
+    const token = cookieStore.get(COOKIE_NAME)?.value ?? null;
 
     const payload = verifyToken(token);
     if (!payload) {
@@ -65,6 +61,15 @@ export async function POST(request: NextRequest) {
 
     if (action === "login") {
       // --- LOGIN ---
+      // 10 tentatives par quart d'heure et par IP : freine la force brute
+      // sans gêner un enseignant qui se trompe de mot de passe.
+      const blocked = enforceApiGuard(request, {
+        route: "auth-login",
+        limit: 10,
+        windowMs: 15 * 60 * 1000,
+      });
+      if (blocked) return blocked;
+
       const { email, password } = body;
       if (!email || !password) {
         return NextResponse.json(
@@ -131,6 +136,15 @@ export async function POST(request: NextRequest) {
 
     if (action === "signup") {
       // --- SIGNUP ---
+      // 5 inscriptions par heure et par IP : l'inscription ouvre un compte,
+      // elle n'a aucune raison d'être appelée en rafale.
+      const blocked = enforceApiGuard(request, {
+        route: "auth-signup",
+        limit: 5,
+        windowMs: 60 * 60 * 1000,
+      });
+      if (blocked) return blocked;
+
       const { email, password, fullName, department } = body;
       if (!email || !password || !fullName) {
         return NextResponse.json(

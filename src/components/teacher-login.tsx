@@ -206,7 +206,9 @@ export function TeacherLogin({
         return;
       }
 
-      if (mode === "signup" && response.message) {
+      // La route d'inscription pose directement le cookie de session : on ne
+      // redemande le mot de passe que si aucun utilisateur n'est renvoyé.
+      if (mode === "signup" && !response.user && response.message) {
         toast({
           title: "Compte créé",
           description: response.message + " Vous pouvez vous connecter.",
@@ -316,8 +318,8 @@ export function TeacherLogin({
               </h2>
               <p className="text-xs text-muted-foreground mt-1">
                 {mode === "login"
-                  ? "Connectez-vous pour synchroniser vos données sur vos appareils."
-                  : "Inscription sécurisée via Supabase Auth."}
+                  ? "Connectez-vous pour retrouver votre profil enseignant. Les données pédagogiques restent enregistrées sur cet appareil."
+                  : "Compte enseignant : mot de passe haché (bcrypt), session de 8 heures."}
               </p>
             </div>
 
