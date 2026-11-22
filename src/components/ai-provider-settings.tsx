@@ -70,9 +70,14 @@ export function AiProviderSettings() {
     setProviderId(id);
     setTestResult(null);
     localStorage.setItem(AI_STORAGE_KEYS.provider, id);
-    // Le modèle sauvegardé peut ne pas exister chez le nouveau fournisseur
+    // Le modèle ET la clé sont propres au fournisseur. Conserver la clé
+    // précédente revenait à l'envoyer au nouveau fournisseur à la première
+    // requête : une clé OpenAI pouvait partir chez Groq, et inversement.
     setModel("");
     localStorage.removeItem(AI_STORAGE_KEYS.model);
+    setApiKey("");
+    localStorage.removeItem(AI_STORAGE_KEYS.apiKey);
+    localStorage.removeItem(LEGACY_MISTRAL_KEY);
   };
 
   const handleKeyChange = (value: string) => {
