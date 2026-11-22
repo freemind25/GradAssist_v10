@@ -11,7 +11,6 @@ import {
 import {
   BookCopy,
   Calculator,
-  Cloud,
   Download,
   GraduationCap,
   HelpCircle,
@@ -120,8 +119,8 @@ const sections = [
     color: "text-cyan-600",
     steps: [
       "Export PDF individuel : la fiche d'évaluation d'un seul étudiant.",
-      "Export CSV/Excel : tableau récapitulatif de toutes les évaluations.",
-      "📥 PV des Notes : génère un PDF au format officiel algérien (liste des étudiants avec notes CC).",
+      "Export CSV : tableau récapitulatif de toutes les évaluations.",
+      "📥 PV des Notes : génère un PDF à en-tête officiel (liste des étudiants). Les colonnes de notes et de signature sont à compléter à la main avant diffusion.",
       "Les exports incluent le logo de l'université si vous l'avez uploardé.",
       "Pour les présences, exportez le registre mensuel en PDF ou envoyez-le par email.",
     ],
@@ -169,16 +168,16 @@ const sections = [
     ],
   },
   {
-    icon: Cloud,
-    title: "Synchronisation Cloud",
+    icon: Download,
+    title: "Sauvegarde et restauration",
     color: "text-sky-600",
     steps: [
-      "Indicateur de connexion en haut : ☁️ Cloud (connecté) ou 💾 Local (hors ligne).",
-      "Menu « Fichier » → « 🔄 Synchroniser Cloud » : pousse les données vers Neon et les récupère.",
-      "« 📤 Envoyer vers Cloud » : sauvegarde uniquement vos données vers le serveur.",
-      "« 📥 Charger depuis Cloud » : récupère les données depuis le serveur.",
-      "Toutes les données sont synchronisées : modules, notes, présences, encadrement, canevas.",
-      "La synchronisation est optionnelle — l'application fonctionne parfaitement en mode local.",
+      "Vos données sont enregistrées dans le stockage local de cet appareil, pas sur un serveur : elles ne suivent pas d'un appareil à l'autre et disparaissent si le cache du navigateur est vidé.",
+      "Menu « Fichier » → « Sauvegarder mes données (JSON) » télécharge un fichier contenant tous vos modules : notes, présences, encadrement, canevas, tutorat.",
+      "Conservez ce fichier hors de l'application (clé USB, espace personnel, Drive) et renouvelez la sauvegarde régulièrement.",
+      "Menu « Fichier » → « Restaurer une sauvegarde… » réimporte un fichier. « Remplacer » écrase les modules chargés, « Ajouter » les conserve et place la sauvegarde à côté.",
+      "Le pied de page affiche l'espace occupé. Si le quota du navigateur est atteint, un bandeau rouge apparaît : sauvegardez, puis allégez les logos et les PDF de canevas.",
+      "La synchronisation automatique entre appareils n'existe pas : la sauvegarde par fichier est aujourd'hui le seul moyen de transférer vos données.",
     ],
   },
 ];
@@ -275,7 +274,7 @@ export function HelpGuideDialog() {
               </li>
               <li className="flex items-start gap-2">
                 <span>•</span>
-                <span>Activez la <strong>Synchronisation Cloud</strong> (Neon) pour sauvegarder vos données en ligne et y accéder depuis n&apos;importe quel appareil.</span>
+                <span>Vos données restent sur cet appareil. Utilisez <strong>Fichier → Sauvegarder mes données (JSON)</strong> pour en conserver une copie hors de l&apos;application.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span>•</span>
@@ -292,7 +291,7 @@ export function HelpGuideDialog() {
             <div className="grid grid-cols-2 gap-2 text-sm text-foreground/80">
               <div className="flex items-center gap-2">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border text-xs font-mono">Fichier</kbd>
-                <span>Créer / supprimer / synchroniser</span>
+                <span>Créer / supprimer / sauvegarder</span>
               </div>
               <div className="flex items-center gap-2">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border text-xs font-mono">Sidebar</kbd>
@@ -300,7 +299,7 @@ export function HelpGuideDialog() {
               </div>
               <div className="flex items-center gap-2">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border text-xs font-mono">Export</kbd>
-                <span>PDF / CSV / Excel / PV</span>
+                <span>PDF / CSV / PV</span>
               </div>
               <div className="flex items-center gap-2">
                 <kbd className="px-1.5 py-0.5 rounded bg-muted border text-xs font-mono">Email</kbd>
@@ -311,8 +310,8 @@ export function HelpGuideDialog() {
                 <span>Assistant IA contextualisé</span>
               </div>
               <div className="flex items-center gap-2">
-                <kbd className="px-1.5 py-0.5 rounded bg-muted border text-xs font-mono">Cloud</kbd>
-                <span>Synchroniser avec Neon DB</span>
+                <kbd className="px-1.5 py-0.5 rounded bg-muted border text-xs font-mono">Sauvegarde</kbd>
+                <span>Exporter / restaurer un fichier JSON</span>
               </div>
             </div>
           </div>
@@ -320,7 +319,7 @@ export function HelpGuideDialog() {
           {/* Version info */}
           <div className="text-center text-xs text-muted-foreground pt-2 border-t">
             <p>GradeAssist v10 — Application d&apos;évaluation académique</p>
-            <p className="mt-0.5">Données locales + Cloud · Assistant IA · Conçu par M.SADI</p>
+            <p className="mt-0.5">Données locales · Assistant IA · Conçu par M.SADI</p>
           </div>
         </div>
       </DialogContent>
