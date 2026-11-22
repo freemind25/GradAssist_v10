@@ -50,28 +50,36 @@ export function PvExport({ evaluationData, moduleName }: PvExportProps) {
     // University name
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.text(d.universityName || "Universite de Constantine 3", margin, yPos);
+    doc.text(d.universityName || "............", margin, yPos);
     yPos += 5;
 
     // Institute
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.text(d.establishmentName || "Institut de Gestion et Techniques Urbaines", margin, yPos);
+    doc.text(d.establishmentName || "............", margin, yPos);
     yPos += 4;
 
     // Department
-    doc.text(d.departmentName || "Departement de Gestion des Villes et l'Urbanisation", margin, yPos);
+    doc.text(d.departmentName || "............", margin, yPos);
 
     // ── Right header: Logo + Arabic text ──
     if (d.universityLogo) {
       try {
-        const img = new window.Image();
-        img.src = d.universityLogo;
+        // Dimensions lues de façon synchrone : `new window.Image()` renvoyait
+        // 0/0 tant que l'image n'était pas chargée (ratio NaN, logo absent).
+        const props = doc.getImageProperties(d.universityLogo);
         const logoWidth = 22;
-        const logoHeight = (img.height * logoWidth) / img.width;
-        doc.addImage(d.universityLogo, "PNG", pageWidth - margin - logoWidth, 8, logoWidth, logoHeight);
+        const logoHeight = props.width > 0 ? (props.height * logoWidth) / props.width : logoWidth;
+        const typeMatch = d.universityLogo.match(/^data:image\/(png|jpe?g|gif);base64,/);
+        const logoType =
+          typeMatch?.[1] === "jpeg" || typeMatch?.[1] === "jpg"
+            ? "JPEG"
+            : typeMatch?.[1] === "gif"
+              ? "GIF"
+              : "PNG";
+        doc.addImage(d.universityLogo, logoType, pageWidth - margin - logoWidth, 8, logoWidth, logoHeight);
       } catch {
-        // Logo not loaded
+        // Logo illisible : on continue sans lui plutôt que d'échouer.
       }
     }
 
@@ -111,23 +119,23 @@ export function PvExport({ evaluationData, moduleName }: PvExportProps) {
     doc.setFont("helvetica", "bold");
     doc.text("Annee Academique:", leftCol, yPos);
     doc.setFont("helvetica", "normal");
-    doc.text(d.academicYear || "2025/2026", leftCol + 32, yPos);
+    doc.text(d.academicYear || "............", leftCol + 32, yPos);
 
     doc.setFont("helvetica", "bold");
     doc.text("Filiere:", leftCol, yPos + 5);
     doc.setFont("helvetica", "normal");
-    doc.text(d.masterSpecialty || "Gestion des techniques urbaines", leftCol + 18, yPos + 5);
+    doc.text(d.masterSpecialty || "............", leftCol + 18, yPos + 5);
 
     doc.setFont("helvetica", "bold");
     doc.text("Specialite:", leftCol, yPos + 10);
     doc.setFont("helvetica", "normal");
-    doc.text(d.departmentName || "gestion des villes", leftCol + 22, yPos + 10);
+    doc.text(d.departmentName || "............", leftCol + 22, yPos + 10);
 
     doc.setFont("helvetica", "bold");
     doc.text("Niveau:", leftCol, yPos + 15);
     doc.setFont("helvetica", "normal");
     doc.text(
-      d.studyLevel && d.studySubLevel ? `${d.studyLevel} ${d.studySubLevel}` : "Master 1",
+      d.studyLevel && d.studySubLevel ? `${d.studyLevel} ${d.studySubLevel}` : "............",
       leftCol + 16,
       yPos + 15
     );
@@ -141,24 +149,24 @@ export function PvExport({ evaluationData, moduleName }: PvExportProps) {
     doc.setFont("helvetica", "bold");
     doc.text("Periode:", midCol, yPos + 5);
     doc.setFont("helvetica", "normal");
-    doc.text(d.session || "Semestre 2", midCol + 18, yPos + 5);
+    doc.text(d.session || "............", midCol + 18, yPos + 5);
 
     doc.setFont("helvetica", "bold");
     doc.text("Enseignant:", midCol, yPos + 10);
     doc.setFont("helvetica", "normal");
-    doc.text(d.teacherNames.filter((n) => n.trim()).join(", ") || "SADI Messaoud", midCol + 24, yPos + 10);
+    doc.text(d.teacherNames.filter((n) => n.trim()).join(", ") || "............", midCol + 24, yPos + 10);
 
     doc.setFont("helvetica", "bold");
     doc.text("Section/Groupe:", midCol, yPos + 15);
     doc.setFont("helvetica", "normal");
-    doc.text("Section A / (Groupe A)", midCol + 30, yPos + 15);
+    doc.text("............", midCol + 30, yPos + 15);
 
     // ── Matière line (full width) ──
     yPos += 22;
     doc.setFont("helvetica", "bold");
     doc.text("Matiere:", leftCol, yPos);
     doc.setFont("helvetica", "normal");
-    doc.text(moduleName || "Atelier 2 : Projets de ville 2", leftCol + 18, yPos);
+    doc.text(moduleName || "............", leftCol + 18, yPos);
 
     // ══════════════════════════════════════════════════════════════
     //  TITLE
@@ -187,7 +195,9 @@ export function PvExport({ evaluationData, moduleName }: PvExportProps) {
       const prenom = parts.length > 1 ? parts.slice(1).join(" ") : "";
       return [
         i + 1,
-        `${222234}${String(100000 + i).slice(1)}`, // Matricule placeholder
+        // Le matricule n'existe pas dans les données : case laissée vide plutôt
+        // qu'un numéro inventé qui aurait l'air officiel.
+        "",
         nom.toUpperCase(),
         prenom,
         "",

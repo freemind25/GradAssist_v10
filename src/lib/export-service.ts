@@ -69,11 +69,13 @@ const getImageTypeFromBase64 = (base64: string): string => {
 
 const addLogoToPDF = (doc: jsPDF, logo: string, yPos: number, pageWidth: number, pageMargin: number): number => {
   try {
-    const img = new window.Image();
-    img.src = logo;
+    // jsPDF décode l'en-tête de l'image de façon SYNCHRONE. Passer par
+    // `new window.Image()` renvoyait width/height = 0 tant que l'image n'était
+    // pas chargée, ce qui produisait un ratio NaN et un logo absent du PDF.
+    const props = doc.getImageProperties(logo);
     const imageType = getImageTypeFromBase64(logo);
     const logoWidth = 25;
-    const logoHeight = (img.height * logoWidth) / img.width;
+    const logoHeight = props.width > 0 ? (props.height * logoWidth) / props.width : logoWidth;
     doc.addImage(logo, imageType, pageWidth - pageMargin - logoWidth, yPos, logoWidth, logoHeight);
     return yPos + logoHeight + 5;
   } catch (e) {
@@ -84,12 +86,18 @@ const addLogoToPDF = (doc: jsPDF, logo: string, yPos: number, pageWidth: number,
 };
 
 const downloadFile = (content: string, filename: string): void => {
+  // BOM UTF-8 : sans lui, Excel affiche « Ã© » à la place de « é ».
+  // Un Blob évite aussi la troncature des URL contenant « # », que
+  // `encodeURI` ne neutralise pas.
+  const blob = new Blob(["\uFEFF", content], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  link.setAttribute("href", encodeURI(content));
+  link.setAttribute("href", url);
   link.setAttribute("download", filename);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 };
 
 // [SEC-03] Sanitizer anti-formula injection CSV/Excel.
