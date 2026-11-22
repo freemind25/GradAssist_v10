@@ -304,6 +304,9 @@ export default function GradeAssistPage() {
   const [teacher, setTeacherState] = useState<TeacherProfile | null>(null);
   const [teacherChecked, setTeacherChecked] = useState(false);
   const [configuringModuleId, setConfiguringModuleId] = useState<string | null>(null);
+  // Module dont l'utilisateur a refusé la configuration : on ne le rouvre plus
+  // automatiquement (l'effet d'auto-ouverture le faisait à chaque rendu).
+  const [dismissedBlankId, setDismissedBlankId] = useState<string | null>(null);
   const [storageFull, setStorageFull] = useState(false);
   const [pendingImport, setPendingImport] = useState<
     (ParsedBackup & { fileName: string }) | null
@@ -398,6 +401,28 @@ export default function GradeAssistPage() {
     return () => clearTimeout(handler);
   }, [modules, activeModuleId, isLoaded, persist]);
 
+  // Le debounce d'une seconde perdait la dernière modification si l'utilisateur
+  // fermait l'onglet, rechargeait la page ou basculait d'application juste
+  // après une saisie : le module créé n'était jamais écrit. On force une
+  // écriture dès que la page quitte le premier plan.
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const flush = () => {
+      persist(modules, activeModuleId);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [modules, activeModuleId, isLoaded, persist]);
+
   // Check teacher login
   useEffect(() => {
     const t = getTeacher();
@@ -417,10 +442,16 @@ export default function GradeAssistPage() {
 
   // Auto-trigger configuration dialog for blank modules
   useEffect(() => {
-    if (isLoaded && isModuleBlank && activeModule && !configuringModuleId) {
+    if (
+      isLoaded &&
+      isModuleBlank &&
+      activeModule &&
+      !configuringModuleId &&
+      activeModule.id !== dismissedBlankId
+    ) {
       setConfiguringModuleId(activeModule.id);
     }
-  }, [isLoaded, isModuleBlank, activeModule, configuringModuleId]);
+  }, [isLoaded, isModuleBlank, activeModule, configuringModuleId, dismissedBlankId]);
 
   const handleConfigureModule = useCallback((moduleId: string, name: string, type: ModuleType) => {
     setModules(prevModules => {
@@ -748,7 +779,12 @@ export default function GradeAssistPage() {
           <ConfigureModuleDialog
             module={modules.find(m => m.id === configuringModuleId)!}
             onConfigure={handleConfigureModule}
-            onDismiss={() => setConfiguringModuleId(null)}
+            onDismiss={() => {
+              // Mémorise le refus : sans cela, l'effet d'auto-ouverture
+              // rouvrait le dialogue aussitôt tant que le module restait vide.
+              setDismissedBlankId(configuringModuleId);
+              setConfiguringModuleId(null);
+            }}
           />
         )}
 
