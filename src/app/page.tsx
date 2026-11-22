@@ -2,7 +2,7 @@
 
 import type * as React from 'react';
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { BookCopy, Plus, FolderPlus, Trash2 } from "lucide-react";
+import { BookCopy, Plus, FolderPlus, Trash2, Download, Upload, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DEFAULT_CRITERIA, TARGET_SUM_COEFFICIENTS } from "@/config/grading-config";
@@ -14,6 +14,14 @@ import { HelpGuideDialog } from '@/components/help-guide-dialog';
 import { TeacherLogin, getTeacher, type TeacherProfile } from '@/components/teacher-login';
 import { GoogleDriveSync } from '@/components/google-drive-sync';
 import { PwaInstallBanner } from '@/components/pwa-install';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  downloadBackup,
+  parseBackup,
+  estimateStorageBytes,
+  formatBytes,
+  type ParsedBackup,
+} from '@/lib/backup-service';
 
 import {
   Menubar,
@@ -296,7 +304,12 @@ export default function GradeAssistPage() {
   const [teacher, setTeacherState] = useState<TeacherProfile | null>(null);
   const [teacherChecked, setTeacherChecked] = useState(false);
   const [configuringModuleId, setConfiguringModuleId] = useState<string | null>(null);
-  
+  const [storageFull, setStorageFull] = useState(false);
+  const [pendingImport, setPendingImport] = useState<
+    (ParsedBackup & { fileName: string }) | null
+  >(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -355,18 +368,35 @@ export default function GradeAssistPage() {
     }
   }, []);
 
+  // Écriture dans localStorage : signale explicitement un quota dépassé.
+  // Auparavant l'échec était seulement journalisé en console, alors que le
+  // pied de page affirmait « Données sauvegardées localement ».
+  const persist = useCallback(
+    (mods: EvaluationModuleType[], activeId: string | null): boolean => {
+      try {
+        localStorage.setItem(LOCALSTORAGE_MODULES_KEY, JSON.stringify(mods));
+        localStorage.setItem(
+          LOCALSTORAGE_ACTIVE_MODULE_ID_KEY,
+          JSON.stringify(activeId)
+        );
+        setStorageFull(false);
+        return true;
+      } catch (error) {
+        console.error("Échec de la sauvegarde locale :", error);
+        setStorageFull(true);
+        return false;
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     if (!isLoaded) return;
     const handler = setTimeout(() => {
-      try {
-        localStorage.setItem(LOCALSTORAGE_MODULES_KEY, JSON.stringify(modules));
-        localStorage.setItem(LOCALSTORAGE_ACTIVE_MODULE_ID_KEY, JSON.stringify(activeModuleId));
-      } catch (error) {
-        console.error("Failed to save data to localStorage:", error);
-      }
+      persist(modules, activeModuleId);
     }, 1000);
     return () => clearTimeout(handler);
-  }, [modules, activeModuleId, isLoaded]);
+  }, [modules, activeModuleId, isLoaded, persist]);
 
   // Check teacher login
   useEffect(() => {
@@ -469,6 +499,89 @@ export default function GradeAssistPage() {
     toast({ title: "Module Supprimé", description: "Le module a été supprimé." });
   }, [modules.length, activeModuleId, toast]);
 
+  // ── Sauvegarde et restauration locales ────────────────────────────────
+  // Le stockage du navigateur n'est pas une sauvegarde : ces deux actions
+  // produisent un fichier que l'enseignant conserve hors de l'application.
+  const storageBytes = useMemo(() => estimateStorageBytes(modules), [modules]);
+
+  const handleExportBackup = useCallback(() => {
+    if (modules.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Rien à sauvegarder",
+        description: "Aucun module n'est chargé.",
+      });
+      return;
+    }
+    try {
+      const bytes = downloadBackup(modules, APP_VERSION);
+      toast({
+        title: "Sauvegarde téléchargée",
+        description: `${modules.length} module(s), ${formatBytes(bytes)}.`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Sauvegarde impossible",
+        description:
+          error instanceof Error ? error.message : "Erreur inconnue.",
+      });
+    }
+  }, [modules, toast]);
+
+  const handleBackupFile = useCallback(
+    async (file: File) => {
+      try {
+        const text = await file.text();
+        const parsed = parseBackup(text);
+        setPendingImport({ ...parsed, fileName: file.name });
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Restauration impossible",
+          description:
+            error instanceof Error ? error.message : "Fichier invalide.",
+        });
+      }
+    },
+    [toast]
+  );
+
+  const applyImport = useCallback(
+    (mode: "replace" | "merge") => {
+      if (!pendingImport) return;
+      const imported = pendingImport.modules;
+
+      // En mode « ajouter », les identifiants sont régénérés pour ne jamais
+      // écraser un module existant.
+      const prepared =
+        mode === "replace"
+          ? imported
+          : imported.map((module, index) => ({
+              ...module,
+              id: `module_${Date.now()}_${index}`,
+              evaluationData: {
+                ...module.evaluationData,
+                id: `eval_${Date.now()}_${index}`,
+              },
+            }));
+
+      const nextModules =
+        mode === "replace" ? prepared : [...modules, ...prepared];
+
+      setModules(nextModules);
+      setActiveModuleId(nextModules[0]?.id ?? null);
+      setPendingImport(null);
+      toast({
+        title: "Sauvegarde restaurée",
+        description: `${imported.length} module(s) ${
+          mode === "replace" ? "restaurés" : "ajoutés"
+        }.`,
+      });
+    },
+    [pendingImport, modules, toast]
+  );
+
   // Show teacher login screen if not yet identified
   if (teacherChecked && !teacher) {
     return <TeacherLogin onLogin={(profile) => setTeacherState(profile)} />;
@@ -525,6 +638,15 @@ export default function GradeAssistPage() {
                           Supprimer le module actif
                         </MenubarItem>
                       )}
+                      <MenubarSeparator />
+                      <MenubarItem onSelect={handleExportBackup}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Sauvegarder mes données (JSON)
+                      </MenubarItem>
+                      <MenubarItem onSelect={() => fileInputRef.current?.click()}>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Restaurer une sauvegarde…
+                      </MenubarItem>
                     </MenubarContent>
                   </MenubarMenu>
                 </Menubar>
@@ -532,6 +654,33 @@ export default function GradeAssistPage() {
             </div>
           </div>
         </header>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void handleBackupFile(file);
+            event.target.value = "";
+          }}
+        />
+
+        {storageFull && (
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Stockage local saturé</AlertTitle>
+              <AlertDescription>
+                Les dernières modifications n&apos;ont pas pu être enregistrées :
+                le quota du navigateur est atteint. Téléchargez une sauvegarde
+                (menu Fichier), puis allégez les modules les plus lourds (logos,
+                PDF de canevas).
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
 
         {/* Module Tabs Bar */}
         <div className="bg-card border-b sticky top-0 z-30">
@@ -603,18 +752,43 @@ export default function GradeAssistPage() {
           />
         )}
 
+        <AlertDialog
+          open={pendingImport !== null}
+          onOpenChange={(open) => {
+            if (!open) setPendingImport(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Restaurer cette sauvegarde ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {pendingImport
+                  ? `${pendingImport.modules.length} module(s) trouvés dans « ${pendingImport.fileName} ». « Remplacer » écrase les modules actuellement chargés ; « Ajouter » les conserve et ajoute la sauvegarde à côté.`
+                  : ""}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction onClick={() => applyImport("merge")}>
+                Ajouter
+              </AlertDialogAction>
+              <AlertDialogAction
+                onClick={() => applyImport("replace")}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Remplacer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
             <EvaluationModule
                 key={activeModule.id}
                 module={activeModule}
                 onUpdate={(update) => handleUpdateModule(activeModule.id, update)}
                 onSave={() => {
-                    try {
-                        localStorage.setItem(LOCALSTORAGE_MODULES_KEY, JSON.stringify(modules));
-                        localStorage.setItem(LOCALSTORAGE_ACTIVE_MODULE_ID_KEY, JSON.stringify(activeModuleId));
-                    } catch (error) {
-                        console.error("Failed to save data to localStorage:", error);
-                    }
+                    persist(modules, activeModuleId);
                 }}
             />
           
@@ -622,7 +796,10 @@ export default function GradeAssistPage() {
 
             <footer className="text-center text-sm text-muted-foreground py-8 border-t">
                 <p>&copy; {new Date().getFullYear()} GradeAssist. Tous droits réservés.</p>
-                <p className="mt-1">Données sauvegardées localement. {modules.length} module(s) au total.</p>
+                <p className="mt-1">
+                  Données enregistrées sur cet appareil · {modules.length} module(s) ·{" "}
+                  {formatBytes(storageBytes)} utilisés
+                </p>
                 <p className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
                     <Link href="/confidentialite" className="hover:text-accent underline-offset-4 hover:underline">Politique de confidentialité</Link>
                     <Link href="/conditions" className="hover:text-accent underline-offset-4 hover:underline">Conditions d&apos;utilisation</Link>
