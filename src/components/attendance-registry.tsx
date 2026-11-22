@@ -157,41 +157,49 @@ export function AttendanceRegistry({
             return;
         }
         
-        let csvContent = "data:text/csv;charset=utf-8,";
+        // Échappement RFC 4180 + neutralisation des formules tableur
+        // (=, +, -, @) : un nom d'étudiant peut être interprété comme formule.
+        const csvCell = (value: string | number): string => {
+            const text = String(value ?? "");
+            const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+            return `"${safe.replace(/"/g, '""')}"`;
+        };
+
         const monthShort = format(new Date(year, month, 1), 'MMMM', { locale: fr });
-        csvContent += `Rapport d'Absences - ${monthShort} ${year}\n`;
-        csvContent += `Institut:,"${establishmentName || 'N/A'}"\n`;
-        csvContent += `Département:,"${departmentName || 'N/A'}"\n`;
-        csvContent += `Niveau:,"${studyLevel ? `${studyLevel} - ${studySubLevel}`: 'N/A'}"\n`;
-        csvContent += `Enseignant(s):,"${teacherNames.filter(n => n.trim()).join(', ') || 'N/A'}"\n`;
-        csvContent += `Matière:,"${moduleName || 'N/A'}"\n\n`;
+        const lines: string[] = [
+            `Rapport d'Absences - ${monthShort} ${year}`,
+            `${csvCell('Institut')},${csvCell(establishmentName || 'N/A')}`,
+            `${csvCell('Département')},${csvCell(departmentName || 'N/A')}`,
+            `${csvCell('Niveau')},${csvCell(studyLevel ? `${studyLevel} - ${studySubLevel}` : 'N/A')}`,
+            `${csvCell('Enseignant(s)')},${csvCell(teacherNames.filter(n => n.trim()).join(', ') || 'N/A')}`,
+            `${csvCell('Matière')},${csvCell(moduleName || 'N/A')}`,
+            '',
+        ];
 
         const dayHeaders = recordedDays.map(day => {
             const d = format(day, 'd');
             const m = format(day, 'MMM', { locale: fr });
             return `${d}-${m}`;
         });
-        const headers = ["N°", "Nom et Prénom", ...dayHeaders, "Total Absences"];
-        csvContent += headers.join(',') + '\n';
+        lines.push(["N°", "Nom et Prénom", ...dayHeaders, "Total Absences"].map(csvCell).join(','));
 
         studentReports.forEach(({ name, dailyStatuses, absenceCount }, idx) => {
-            const rowData = recordedDays.map(day => `"${dailyStatuses[day.getDate()] || 'P'}"`);
-            const row = [
-                String(idx + 1),
-                `"${name}"`,
-                ...rowData,
-                absenceCount
-            ];
-            csvContent += row.join(',') + '\n';
+            const rowData = recordedDays.map(day => csvCell(dailyStatuses[day.getDate()] || 'P'));
+            lines.push([idx + 1, name, ...rowData, absenceCount].map(csvCell).join(','));
         });
-        
-        const encodedUri = encodeURI(csvContent);
+
+        // Blob + BOM : sans le BOM, Excel affiche « Ã© » pour « é ».
+        // Le Blob remplace aussi l'URL `data:` + encodeURI, qui tronquait le
+        // fichier dès qu'une valeur contenait « # ».
+        const blob = new Blob(["\uFEFF", lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
+        link.setAttribute("href", url);
         link.setAttribute("download", `rapport_absences_${year}_${String(month + 1).padStart(2, '0')}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
         toast({ title: "Succès", description: `Rapport CSV pour ${monthName} exporté.` });
     };
 
@@ -247,8 +255,6 @@ export function AttendanceRegistry({
         // Right side: University logo (if available)
         if (universityLogo) {
             try {
-                const img = new window.Image();
-                img.src = universityLogo;
                 const imageTypeMatch = universityLogo.match(/^data:image\/(png|jpe?g|svg\+xml);base64,/);
                 let imageType = 'PNG';
                 if (imageTypeMatch && imageTypeMatch[1]) {
@@ -256,8 +262,11 @@ export function AttendanceRegistry({
                     else if (imageTypeMatch[1] === 'svg+xml') imageType = 'SVG';
                     else imageType = imageTypeMatch[1].toUpperCase();
                 }
+                // Dimensions lues de façon synchrone (cf. export-service) :
+                // l'ancien `new window.Image()` donnait un ratio NaN.
+                const props = doc.getImageProperties(universityLogo);
                 const logoWidth = 22;
-                const logoHeight = (img.height * logoWidth) / img.width;
+                const logoHeight = props.width > 0 ? (props.height * logoWidth) / props.width : logoWidth;
                 doc.addImage(universityLogo, imageType, pageWidth - pageMargin - logoWidth, yPos, logoWidth, logoHeight);
             } catch (e) {
                 console.error("Error adding logo to PDF:", e);
