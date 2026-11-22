@@ -6,6 +6,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Criterion, SelectedGrades, EvaluationData } from "@/types";
 import { toast } from "@/hooks/use-toast";
+import { canExportFiles, notifyDownloadStarted } from "@/lib/export-guard";
 
 const NON_NOTE_VALUE = "__NONE__";
 const BASE_DOCUMENT_TITLE_PREFIX = "Fiche d'évaluation des travaux de l'atelier";
@@ -127,7 +128,9 @@ function csvCell(value: string | undefined | null): string {
 export const exportIndividualCSV = (params: ExportIndividualParams): void => {
   const { criteria, selectedGrades, studentNames, teacherNames, projectName, studyLevel, studySubLevel, session, academicYear, universityName, establishmentName, departmentName, masterSpecialty, universityLogo, totalPoints, maxTotalPoints, evaluationSheetTitleComplement } = params;
 
-  let csv = `data:text/csv;charset=utf-8,${sanitizeCsvCell(getDocumentTitle(evaluationSheetTitleComplement))}\n`;
+  // Plus de préfixe « data:text/csv » : downloadFile écrit un Blob, le préfixe
+  // serait donc recopié littéralement en tête du fichier.
+  let csv = `${sanitizeCsvCell(getDocumentTitle(evaluationSheetTitleComplement))}\n`;
   if (universityLogo) csv += "Logo Université:,(Logo fourni)\n";
   csv += `Université:,${csvCell(universityName)}\nÉtablissement:,${csvCell(establishmentName)}\nDépartement:,${csvCell(departmentName)}\n`;
   csv += `Niveau d'étude:,${csvCell(studyLevel ? `${studyLevel} - ${studySubLevel}` : 'N/A')}\n`;
@@ -146,8 +149,10 @@ export const exportIndividualCSV = (params: ExportIndividualParams): void => {
   });
 
   csv += `\nTotal des Points,""," ",${totalPoints.toFixed(2)}\nSur,""," ",${maxTotalPoints.toFixed(2)}\n`;
-  downloadFile(csv, `evaluation_${generateFileNameBase(studentNames)}.csv`);
-  toast({ title: "Succès", description: "Fichier CSV exporté." });
+  if (!canExportFiles()) return;
+  const fileName = `evaluation_${generateFileNameBase(studentNames)}.csv`;
+  downloadFile(csv, fileName);
+  notifyDownloadStarted(fileName);
 };
 
 export const exportSummaryCSV = (params: ExportSummaryParams): void => {
@@ -159,7 +164,7 @@ export const exportSummaryCSV = (params: ExportSummaryParams): void => {
   }
 
   const first = allEvaluations[0];
-  let csv = `data:text/csv;charset=utf-8,Synthèse des Évaluations - ${sanitizeCsvCell(moduleName)}\n`;
+  let csv = `Synthèse des Évaluations - ${sanitizeCsvCell(moduleName)}\n`;
   if (first.evaluationSheetTitleComplement && first.evaluationSheetTitleComplement !== "...............................................................") {
     csv += `Contexte:,${csvCell(first.evaluationSheetTitleComplement)}\n`;
   }
@@ -185,8 +190,10 @@ export const exportSummaryCSV = (params: ExportSummaryParams): void => {
     ].join(',') + '\n';
   });
 
-  downloadFile(csv, `${generateSummaryFileNameBase(moduleName)}.csv`);
-  toast({ title: "Succès", description: "Synthèse CSV exportée." });
+  if (!canExportFiles()) return;
+  const fileName = `${generateSummaryFileNameBase(moduleName)}.csv`;
+  downloadFile(csv, fileName);
+  notifyDownloadStarted(fileName);
 };
 
 export const exportIndividualPDF = (params: ExportIndividualParams): void => {
@@ -241,8 +248,10 @@ export const exportIndividualPDF = (params: ExportIndividualParams): void => {
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.text(`Note Finale: ${totalPoints.toFixed(2)} / ${maxTotalPoints.toFixed(2)}`, pageMargin, finalY + 10);
-  doc.save(`evaluation_${generateFileNameBase(studentNames)}.pdf`);
-  toast({ title: "Succès", description: "Fichier PDF exporté." });
+  if (!canExportFiles()) return;
+  const pdfFileName = `evaluation_${generateFileNameBase(studentNames)}.pdf`;
+  doc.save(pdfFileName);
+  notifyDownloadStarted(pdfFileName);
 };
 
 export const exportSummaryPDF = (params: ExportSummaryParams): void => {
@@ -307,6 +316,8 @@ export const exportSummaryPDF = (params: ExportSummaryParams): void => {
     columnStyles: { 0: { cellWidth: 8, halign: 'center' as const }, 1: { cellWidth: 40, halign: 'left' as const }, 2: { cellWidth: 40, halign: 'left' as const }, 3: { cellWidth: 'auto' as const, halign: 'left' as const }, 4: { cellWidth: 18, halign: 'center' as const }, 5: { cellWidth: 20, halign: 'left' as const }, 6: { cellWidth: 10, halign: 'center' as const }, 7: { cellWidth: 16, halign: 'center' as const }, 8: { cellWidth: 15, halign: 'center' as const, fontStyle: 'bold' as const } },
   });
 
-  doc.save(`${generateSummaryFileNameBase(moduleName)}.pdf`);
-  toast({ title: "Succès", description: "Synthèse PDF exportée." });
+  if (!canExportFiles()) return;
+  const summaryFileName = `${generateSummaryFileNameBase(moduleName)}.pdf`;
+  doc.save(summaryFileName);
+  notifyDownloadStarted(summaryFileName);
 };

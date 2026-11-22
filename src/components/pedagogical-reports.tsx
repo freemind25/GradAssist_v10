@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { uploadToDrive, isDriveConnected } from '@/lib/google-drive-service';
+import { canExportFiles, notifyDownloadStarted } from '@/lib/export-guard';
 import type { EvaluationData, ModuleType, SyllabusChapter, TutoringSession, TutoringSessionType, ThesisStudent } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -243,7 +244,10 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
     const content = buildReportContent(reportType);
     const defaultFileName = getReportFileName(reportType);
 
-    // Download the file — the browser will open a save dialog or download directly
+    // Sur la WebView Android, cette manœuvre est ignorée sans erreur : on
+    // prévient au lieu de laisser croire à un enregistrement.
+    if (!canExportFiles()) return;
+
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -252,7 +256,8 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    notifyDownloadStarted(defaultFileName);
   };
 
   return (

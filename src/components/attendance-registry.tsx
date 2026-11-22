@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { canExportFiles, notifyDownloadStarted } from "@/lib/export-guard";
 import { CheckCircle2, XCircle, Clock, FileText, UserCheck, Download, Calendar as CalendarIcon, FileBarChart, Mail, Send } from "lucide-react";
 import type { AttendanceData, AttendanceStatus } from "@/types";
 import { cn } from '@/lib/utils';
@@ -191,16 +192,18 @@ export function AttendanceRegistry({
         // Blob + BOM : sans le BOM, Excel affiche « Ã© » pour « é ».
         // Le Blob remplace aussi l'URL `data:` + encodeURI, qui tronquait le
         // fichier dès qu'une valeur contenait « # ».
+        if (!canExportFiles()) return;
+        const csvFileName = `rapport_absences_${year}_${String(month + 1).padStart(2, '0')}.csv`;
         const blob = new Blob(["\uFEFF", lines.join('\n')], { type: 'text/csv;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", `rapport_absences_${year}_${String(month + 1).padStart(2, '0')}.csv`);
+        link.setAttribute("download", csvFileName);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         setTimeout(() => URL.revokeObjectURL(url), 2000);
-        toast({ title: "Succès", description: `Rapport CSV pour ${monthName} exporté.` });
+        notifyDownloadStarted(csvFileName);
     };
 
     const handleExportPDF = (concise: boolean) => {
@@ -365,8 +368,10 @@ export function AttendanceRegistry({
         doc.setTextColor(80, 80, 80);
         doc.text("Légende: P = Présent, A = Absent, R = Retard, E = Excusé", pageMargin, finalY + 8);
 
-        doc.save(`rapport_absences_${year}_${String(month + 1).padStart(2, '0')}${concise ? '_concis' : ''}.pdf`);
-        toast({ title: "Succès", description: `Rapport PDF pour ${monthName} exporté.` });
+        if (!canExportFiles()) return;
+        const pdfFileName = `rapport_absences_${year}_${String(month + 1).padStart(2, '0')}${concise ? '_concis' : ''}.pdf`;
+        doc.save(pdfFileName);
+        notifyDownloadStarted(pdfFileName);
     };
 
     // ── Email helpers ──────────────────────────────────────────────────
