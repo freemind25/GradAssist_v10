@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     "Politique de confidentialité de GradeAssist : collecte, utilisation et protection des données lors de l'utilisation de la connexion à Google Drive.",
 };
 
-const LAST_UPDATED = '10/09/2026';
+const LAST_UPDATED = '22/11/2026';
 const APP_URL = 'https://grad-assist-v10.vercel.app';
 const CONTACT_EMAIL = 'rackho2002@gmail.com';
 
@@ -56,12 +56,6 @@ export default function ConfidentialitePage() {
       </header>
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 max-w-4xl">
-        <div className="mb-8 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
-          <p className="font-semibold text-amber-600 dark:text-amber-400 mb-1">Note avant publication</p>
-          <p className="text-foreground/80">
-            Les champs entre crochets de la version originale (<span className="font-mono text-xs">[GradAssist]</span>, <span className="font-mono text-xs">[rackho2002@gmail.com]</span>, <span className="font-mono text-xs">[10.09.2026]</span>) ont été remplacés par les informations réelles. L&apos;application traitant des données concernant les élèves (notes, noms, évaluations contenues dans les rapports), la section 6 est conservée.
-          </p>
-        </div>
 
         <nav aria-label="Sommaire" className="mb-10 rounded-xl border bg-card p-5">
           <p className="text-sm font-semibold mb-3 flex items-center gap-2">
@@ -107,7 +101,7 @@ export default function ConfidentialitePage() {
             <p>Ces données sont utilisées exclusivement pour :</p>
             <ul className="space-y-2">
               <Bullet>Identifier l&apos;enseignant dans l&apos;application.</Bullet>
-              <Bullet>Sauvegarder automatiquement les rapports de classe générés par l&apos;application dans le Google Drive personnel de l&apos;enseignant, à sa demande.</Bullet>
+              <Bullet>Sauvegarder les rapports de classe dans le Google Drive personnel de l&apos;enseignant, à sa demande explicite.</Bullet>
             </ul>
           </Section>
 
@@ -130,15 +124,17 @@ export default function ConfidentialitePage() {
 
           <Section id="stockage" title="5. Stockage et sécurité des données">
             <ul className="space-y-2">
-              <Bullet>Les jetons d&apos;accès (tokens) permettant à l&apos;application de communiquer avec le Drive de l&apos;enseignant sont stockés de manière chiffrée sur nos serveurs.</Bullet>
-              <Bullet>Ces jetons ne sont jamais transmis ou exposés côté navigateur (frontend).</Bullet>
-              <Bullet>Nous mettons en œuvre des mesures de sécurité raisonnables pour protéger les données contre l&apos;accès non autorisé, la perte ou la divulgation.</Bullet>
+              <Bullet>Les données pédagogiques (modules, notes, présences, encadrement, canevas, tutorat) sont enregistrées dans le stockage local du navigateur, sur l&apos;appareil de l&apos;enseignant. L&apos;application ne les envoie pas à un serveur.</Bullet>
+              <Bullet>Le jeton d&apos;accès Google Drive est conservé dans le stockage local de l&apos;appareil, le temps de la session, afin de permettre l&apos;envoi de rapports vers le Drive de l&apos;enseignant. Il est supprimé à la déconnexion (voir section 9).</Bullet>
+              <Bullet>La clé API du fournisseur d&apos;assistance IA, lorsqu&apos;elle est renseignée, est conservée de la même manière sur l&apos;appareil.</Bullet>
+              <Bullet>Le mot de passe du compte enseignant est conservé sous forme hachée (bcrypt) ; la session repose sur un cookie inaccessible au code JavaScript de la page.</Bullet>
+              <Bullet>Nous mettons en œuvre des mesures de sécurité raisonnables pour protéger les données contre l&apos;accès non autorisé, la perte ou la divulgation. Ces mesures reposent en grande partie sur la sécurité de l&apos;appareil de l&apos;enseignant : nous recommandons de verrouiller la session et d&apos;effectuer des sauvegardes régulières.</Bullet>
             </ul>
           </Section>
 
           <Section id="eleves" title="6. Données concernant les élèves">
             <p>
-              Les rapports générés et sauvegardés par l&apos;application peuvent contenir des informations relatives aux élèves (par exemple des données de suivi de classe), saisies par l&apos;enseignant lui-même. Ces informations restent sous le contrôle exclusif de l&apos;enseignant : elles sont stockées uniquement dans le Google Drive personnel de cet enseignant, et <strong>GradeAssist</strong> n&apos;y accède pas au-delà de leur transmission technique lors de la sauvegarde.
+              Les informations relatives aux élèves (noms, notes, présences, sujets de mémoire) sont saisies par l&apos;enseignant et enregistrées sur son appareil. Elles restent sous son contrôle exclusif. Elles ne quittent l&apos;appareil que dans deux cas, tous deux déclenchés par l&apos;enseignant : l&apos;envoi explicite d&apos;un rapport vers son propre Google Drive, et l&apos;utilisation de l&apos;assistant IA (voir section 7).
             </p>
             <p>
               Il appartient à l&apos;enseignant, en tant que responsable pédagogique, de respecter les règles applicables à la protection des données de ses élèves dans le cadre de son établissement.
@@ -147,13 +143,20 @@ export default function ConfidentialitePage() {
 
           <Section id="tiers" title="7. Partage des données avec des tiers">
             <p>
-              Nous ne vendons, ne louons et ne partageons vos données avec aucun tiers à des fins commerciales ou publicitaires. Les seules communications de données ont lieu avec les services Google (Google Drive API), strictement nécessaires au fonctionnement de la fonctionnalité de sauvegarde.
+              Nous ne vendons ni ne louons vos données, et nous ne les partageons pas à des fins commerciales ou publicitaires. Deux catégories de tiers peuvent recevoir des données, <strong>uniquement à l&apos;initiative de l&apos;enseignant</strong> :
+            </p>
+            <ul className="space-y-2">
+              <Bullet><strong>Google</strong> (API Google Drive) : lors de l&apos;envoi explicite d&apos;un rapport vers le compte Drive de l&apos;enseignant.</Bullet>
+              <Bullet><strong>Le fournisseur d&apos;assistance IA choisi par l&apos;enseignant</strong> (RoutesMe, Groq Cloud, OpenRouter, Google Gemini, OpenAI, Mistral AI ou CodeCraft AI) : lorsque l&apos;assistant est utilisé, le contexte du module — incluant les noms des étudiants, leurs notes et leurs présences — est transmis à ce fournisseur pour produire la réponse. Aucun fournisseur n&apos;est imposé : la clé et le fournisseur sont configurés par l&apos;enseignant, qui peut ne pas utiliser cette fonctionnalité.</Bullet>
+            </ul>
+            <p>
+              Aucune autre communication de données n&apos;a lieu. Les fournisseurs d&apos;IA appliquent leurs propres conditions et politiques de confidentialité, que nous invitons l&apos;enseignant à consulter avant d&apos;utiliser l&apos;assistant avec des données nominatives.
             </p>
           </Section>
 
           <Section id="conservation" title="8. Durée de conservation">
             <p>
-              Les jetons d&apos;accès et informations de profil associés sont conservés tant que l&apos;enseignant utilise la fonctionnalité de connexion à Google Drive. Ils sont supprimés dès que l&apos;enseignant révoque l&apos;accès (voir <a href="#revocation" className="text-accent underline underline-offset-4">section 9</a>) ou demande la suppression de son compte.
+              Le jeton d&apos;accès Google Drive et les informations de profil associées sont conservés sur l&apos;appareil de l&apos;enseignant tant qu&apos;il n&apos;utilise pas l&apos;option de déconnexion. Ils sont supprimés dès que l&apos;enseignant révoque l&apos;accès (voir <a href="#revocation" className="text-accent underline underline-offset-4">section 9</a>).
             </p>
           </Section>
 
