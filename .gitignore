@@ -22,6 +22,12 @@ electron/standalone/
 *.rar
 *.7z
 
+# ── Artefacts de build (ne jamais versionner un binaire téléchargé) ───
+*.apk
+*.aab
+*.exe
+*.dmg
+
 # ── Environnement ─────────────────────────────────────────────────────
 .env
 .env.local

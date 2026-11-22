@@ -74,8 +74,10 @@ export function extractStudentNames(rows: unknown[]): string[] {
 
       // Repli historique : deux premières colonnes utiles, en ignorant une 1ʳᵉ
       // colonne purement numérique (ex. un numéro) lorsque l'en-tête est absent.
+      // NB : dans un littéral regex, `\\d` désigne un antislash suivi de « d »,
+      // et non un chiffre — la classe doit s'écrire `\d`.
       let startIdx = 0;
-      if (cells.length > 1 && cells[0] !== '' && /^[\\d.,:;/-]+$/.test(cells[0])) {
+      if (cells.length > 1 && cells[0] !== '' && /^[\d.,:;/-]+$/.test(cells[0])) {
         startIdx = 1;
       }
       const col0 = cells[startIdx] ?? '';
