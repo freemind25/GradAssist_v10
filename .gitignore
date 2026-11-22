@@ -63,3 +63,15 @@ cypress/videos/
 
 # ── TypeScript ────────────────────────────────────────────────────────
 *.tsbuildinfo
+
+# ── Secrets et signature (jamais versionnés) ──────────────────────────
+# Le keystore release et ses mots de passe ne doivent jamais entrer dans git.
+# Voir SECURITY.md pour la procédure de régénération et de rotation.
+*.keystore
+*.jks
+android/keystore.properties
+android/app/gradeassist-release.keystore
+
+# ── Journaux de session d'assistant IA ────────────────────────────────
+# Contiennent des extraits de commandes et parfois des clés API.
+SESSION_MEMORY.md

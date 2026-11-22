@@ -53,11 +53,15 @@ captures/
 .idea/navEditor.xml
 
 # Keystore files
-# Le keystore release est volontairement versionné (pas de secret cloud) :
-# la même signature doit être conservée pour toutes les mises à jour.
-!app/gradeassist-release.keystore
-#*.jks
-#*.keystore
+# Le keystore release N'EST PLUS versionné : la même signature doit être
+# conservée pour les mises à jour, mais le fichier et ses mots de passe
+# doivent rester hors du dépôt (voir SECURITY.md).
+# Sources de signature : android/keystore.properties (local, ignoré)
+# ou variables ANDROID_KEYSTORE_* (CI, secrets GitHub).
+*.jks
+*.keystore
+!*.keystore.example
+keystore.properties
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild

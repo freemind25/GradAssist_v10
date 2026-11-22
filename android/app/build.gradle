@@ -1,5 +1,28 @@
 apply plugin: 'com.android.application'
 
+// ── Sources de la signature release ─────────────────────────────────────
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+def hasKeystoreProperties = keystorePropertiesFile.exists()
+if (hasKeystoreProperties) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+def releaseStorePath = hasKeystoreProperties
+        ? keystoreProperties['storeFile']
+        : System.getenv('ANDROID_KEYSTORE_PATH')
+def releaseStorePassword = hasKeystoreProperties
+        ? keystoreProperties['storePassword']
+        : System.getenv('ANDROID_KEYSTORE_PASSWORD')
+def releaseKeyAlias = hasKeystoreProperties
+        ? keystoreProperties['keyAlias']
+        : System.getenv('ANDROID_KEY_ALIAS')
+def releaseKeyPassword = hasKeystoreProperties
+        ? keystoreProperties['keyPassword']
+        : System.getenv('ANDROID_KEY_PASSWORD')
+
+def hasReleaseSigning = releaseStorePath && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
+
 android {
     namespace = "com.gradeassist.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,21 +39,29 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // ── Signature release ────────────────────────────────────────────────
+    // Le keystore et ses mots de passe ne sont JAMAIS versionnés.
+    // Deux sources, par ordre de priorité :
+    //   1. android/keystore.properties (poste de développement, ignoré par git)
+    //   2. variables d'environnement ANDROID_KEYSTORE_* (CI : secrets GitHub)
+    // Voir SECURITY.md pour la génération du keystore et la rotation.
     signingConfigs {
         release {
-            // Keystore versionné volontairement (pas de secret cloud) : la même
-            // signature doit être conservée pour toutes les futures mises à jour.
-            storeFile file('gradeassist-release.keystore')
-            storePassword 'gradeassist2026'
-            keyAlias 'gradeassist'
-            keyPassword 'gradeassist2026'
+            if (hasReleaseSigning) {
+                storeFile file(releaseStorePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
         }
     }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
@@ -54,6 +85,20 @@ dependencies {
 }
 
 apply from: 'capacitor.build.gradle'
+
+// ── Garde-fou : jamais d'APK release non signé publié par erreur ────────
+gradle.taskGraph.whenReady { graph ->
+    def buildsRelease = graph.allTasks.any {
+        it.name == 'assembleRelease' || it.name == 'bundleRelease'
+    }
+    if (buildsRelease && !hasReleaseSigning) {
+        throw new GradleException(
+            "Signature release absente. Renseignez android/keystore.properties " +
+            "ou les variables ANDROID_KEYSTORE_PATH, ANDROID_KEYSTORE_PASSWORD, " +
+            "ANDROID_KEY_ALIAS et ANDROID_KEY_PASSWORD. Voir SECURITY.md."
+        )
+    }
+}
 
 try {
     def servicesJSON = file('google-services.json')
