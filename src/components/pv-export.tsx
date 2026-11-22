@@ -4,7 +4,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Button } from "@/components/ui/button";
 import { FileDown } from "lucide-react";
-import { canExportFiles, notifyDownloadStarted } from "@/lib/export-guard";
+import { saveDocument } from "@/lib/export-guard";
 import type { EvaluationData } from "@/types";
 
 interface PvExportProps {
@@ -13,7 +13,7 @@ interface PvExportProps {
 }
 
 export function PvExport({ evaluationData, moduleName }: PvExportProps) {
-  const generatePv = () => {
+  const generatePv = async () => {
     const d = evaluationData;
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
@@ -258,11 +258,9 @@ export function PvExport({ evaluationData, moduleName }: PvExportProps) {
     }
 
     // ── Save ──
-    if (!canExportFiles()) return;
     const annee = (d.academicYear || "annee").replace(/\//g, "-");
     const filename = `PV_notes_${moduleName.replace(/\s/g, "_")}_${annee}.pdf`;
-    doc.save(filename);
-    notifyDownloadStarted(filename);
+    await saveDocument(filename, doc.output("blob"));
   };
 
   return (

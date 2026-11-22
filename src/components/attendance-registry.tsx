@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { canExportFiles, notifyDownloadStarted } from "@/lib/export-guard";
+import { saveDocument } from "@/lib/export-guard";
 import { CheckCircle2, XCircle, Clock, FileText, UserCheck, Download, Calendar as CalendarIcon, FileBarChart, Mail, Send } from "lucide-react";
 import type { AttendanceData, AttendanceStatus } from "@/types";
 import { cn } from '@/lib/utils';
@@ -145,7 +145,7 @@ export function AttendanceRegistry({
         };
     };
 
-    const handleExportCSV = () => {
+    const handleExportCSV = async () => {
         if (!selectedDate) {
              toast({ variant: "destructive", title: "Aucune Date", description: "Veuillez sélectionner une date." });
             return;
@@ -190,23 +190,14 @@ export function AttendanceRegistry({
         });
 
         // Blob + BOM : sans le BOM, Excel affiche « Ã© » pour « é ».
-        // Le Blob remplace aussi l'URL `data:` + encodeURI, qui tronquait le
-        // fichier dès qu'une valeur contenait « # ».
-        if (!canExportFiles()) return;
         const csvFileName = `rapport_absences_${year}_${String(month + 1).padStart(2, '0')}.csv`;
-        const blob = new Blob(["\uFEFF", lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", csvFileName);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 2000);
-        notifyDownloadStarted(csvFileName);
+        await saveDocument(
+            csvFileName,
+            new Blob(["\uFEFF", lines.join('\n')], { type: 'text/csv;charset=utf-8' })
+        );
     };
 
-    const handleExportPDF = (concise: boolean) => {
+    const handleExportPDF = async (concise: boolean) => {
         if (!selectedDate) {
             toast({ variant: "destructive", title: "Aucune Date", description: "Veuillez sélectionner une date." });
             return;
@@ -368,10 +359,8 @@ export function AttendanceRegistry({
         doc.setTextColor(80, 80, 80);
         doc.text("Légende: P = Présent, A = Absent, R = Retard, E = Excusé", pageMargin, finalY + 8);
 
-        if (!canExportFiles()) return;
         const pdfFileName = `rapport_absences_${year}_${String(month + 1).padStart(2, '0')}${concise ? '_concis' : ''}.pdf`;
-        doc.save(pdfFileName);
-        notifyDownloadStarted(pdfFileName);
+        await saveDocument(pdfFileName, doc.output('blob'));
     };
 
     // ── Email helpers ──────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { uploadToDrive, isDriveConnected } from '@/lib/google-drive-service';
-import { canExportFiles, notifyDownloadStarted } from '@/lib/export-guard';
+import { saveDocument } from '@/lib/export-guard';
 import type { EvaluationData, ModuleType, SyllabusChapter, TutoringSession, TutoringSessionType, ThesisStudent } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -244,20 +244,12 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
     const content = buildReportContent(reportType);
     const defaultFileName = getReportFileName(reportType);
 
-    // Sur la WebView Android, cette manœuvre est ignorée sans erreur : on
-    // prévient au lieu de laisser croire à un enregistrement.
-    if (!canExportFiles()) return;
-
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = defaultFileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-    notifyDownloadStarted(defaultFileName);
+    // Sur la WebView Android, cette manœuvre est ignorée sans erreur :
+    // `saveDocument` écrit alors sur l'appareil via le plugin Filesystem.
+    await saveDocument(
+      defaultFileName,
+      new Blob([content], { type: 'text/plain;charset=utf-8' })
+    );
   };
 
   return (
