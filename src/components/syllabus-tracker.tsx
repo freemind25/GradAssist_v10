@@ -19,6 +19,8 @@ interface SyllabusTrackerProps {
   syllabus: CourseSyllabus;
   setSyllabus: (value: CourseSyllabus) => void;
   moduleName: string;
+  /** Identifiant du module : sert de clé au PDF stocké dans IndexedDB. */
+  moduleId: string;
 }
 
 const STATUS_CONFIG: Record<ChapterStatus, { label: string; icon: React.ElementType; color: string; bg: string; border: string }> = {
@@ -195,9 +197,16 @@ function ChapterRow({
 const DEFAULT_SYLLABUS: CourseSyllabus = { chapters: [], pdfFileName: null, pdfDataUrl: null };
 
 // ─── IndexedDB helpers for large PDF storage ───
+// Une entrée PAR MODULE. Auparavant tout était écrit sous la clé unique
+// « current_pdf » : importer le canevas d'un module écrasait silencieusement
+// celui des autres, alors que leur nom de fichier restait affiché.
 const DB_NAME = 'GradeAssist_Syllabus';
 const DB_STORE = 'pdfs';
-const DB_KEY = 'current_pdf';
+const LEGACY_DB_KEY = 'current_pdf';
+
+function pdfKey(moduleId: string): string {
+  return `pdf:${moduleId}`;
+}
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -209,27 +218,27 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-async function savePdfToIDB(dataUrl: string | null): Promise<void> {
+async function savePdfToIDB(key: string, dataUrl: string | null): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(DB_STORE, 'readwrite');
     const store = tx.objectStore(DB_STORE);
     if (dataUrl) {
-      store.put(dataUrl, DB_KEY);
+      store.put(dataUrl, key);
     } else {
-      store.delete(DB_KEY);
+      store.delete(key);
     }
     tx.oncomplete = () => { db.close(); resolve(); };
     tx.onerror = () => { db.close(); reject(tx.error); };
   });
 }
 
-async function loadPdfFromIDB(): Promise<string | null> {
+async function loadPdfFromIDB(key: string): Promise<string | null> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(DB_STORE, 'readonly');
     const store = tx.objectStore(DB_STORE);
-    const req = store.get(DB_KEY);
+    const req = store.get(key);
     req.onsuccess = () => { db.close(); resolve(req.result ?? null); };
     req.onerror = () => { db.close(); reject(req.error); };
   });
@@ -350,7 +359,7 @@ function PdfPagesView({ dataUrl }: { dataUrl: string }) {
   );
 }
 
-export function SyllabusTracker({ syllabus: syllabusProp, setSyllabus, moduleName }: SyllabusTrackerProps) {
+export function SyllabusTracker({ syllabus: syllabusProp, setSyllabus, moduleName, moduleId }: SyllabusTrackerProps) {
   const syllabus = syllabusProp ?? DEFAULT_SYLLABUS;
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -360,36 +369,59 @@ export function SyllabusTracker({ syllabus: syllabusProp, setSyllabus, moduleNam
   const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
-  // Load PDF from IndexedDB on mount or when fileName changes
+  // Charge le PDF de CE module. Migre au passage l'ancienne clé unique
+  // (« current_pdf ») vers la clé du module, pour ne rien perdre.
   useEffect(() => {
-    if (syllabus.pdfFileName) {
+    let cancelled = false;
+
+    async function load() {
+      if (!syllabus.pdfFileName) {
+        setPdfDataUrl(null);
+        setPdfBlobUrl(null);
+        return;
+      }
+
       setPdfLoading(true);
-      loadPdfFromIDB()
-        .then((dataUrl) => {
-          if (dataUrl) {
-            // Data URL brut pour l'aperçu (décodage local, sans réseau/CSP)
-            setPdfDataUrl(dataUrl);
-            // Convert base64 data URL to Blob URL for iframe (avoids data URL size issues)
-            const parts = dataUrl.split(',');
-            const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/pdf';
-            const binary = atob(parts[1]);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-            const blob = new Blob([bytes], { type: mime });
-            const blobUrl = URL.createObjectURL(blob);
-            setPdfBlobUrl(blobUrl);
-          } else {
-            setPdfDataUrl(null);
-            setPdfBlobUrl(null);
+      try {
+        let dataUrl = await loadPdfFromIDB(pdfKey(moduleId));
+
+        if (!dataUrl) {
+          const legacy = await loadPdfFromIDB(LEGACY_DB_KEY);
+          if (legacy) {
+            dataUrl = legacy;
+            await savePdfToIDB(pdfKey(moduleId), legacy);
           }
-        })
-        .catch(() => { setPdfDataUrl(null); setPdfBlobUrl(null); })
-        .finally(() => setPdfLoading(false));
-    } else {
-      setPdfDataUrl(null);
-      setPdfBlobUrl(null);
+        }
+
+        if (cancelled) return;
+
+        if (!dataUrl) {
+          setPdfDataUrl(null);
+          setPdfBlobUrl(null);
+          return;
+        }
+
+        setPdfDataUrl(dataUrl);
+        // Conversion base64 → Blob URL pour l'iframe (évite les data URL géantes)
+        const parts = dataUrl.split(',');
+        const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/pdf';
+        const binary = atob(parts[1]);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        setPdfBlobUrl(URL.createObjectURL(new Blob([bytes], { type: mime })));
+      } catch {
+        if (!cancelled) {
+          setPdfDataUrl(null);
+          setPdfBlobUrl(null);
+        }
+      } finally {
+        if (!cancelled) setPdfLoading(false);
+      }
     }
-  }, [syllabus.pdfFileName]);
+
+    void load();
+    return () => { cancelled = true; };
+  }, [syllabus.pdfFileName, moduleId]);
 
   const progress = useMemo(() => computeProgress(syllabus.chapters), [syllabus.chapters]);
 
@@ -419,7 +451,7 @@ export function SyllabusTracker({ syllabus: syllabusProp, setSyllabus, moduleNam
 
       // Save PDF to IndexedDB (large file, doesn't fit in localStorage)
       try {
-        await savePdfToIDB(dataUrl);
+        await savePdfToIDB(pdfKey(moduleId), dataUrl);
       } catch {
         // If IndexedDB fails, store a truncated version in state as fallback
         console.warn('IndexedDB save failed, PDF preview may not work');
@@ -451,7 +483,7 @@ export function SyllabusTracker({ syllabus: syllabusProp, setSyllabus, moduleNam
     reader.readAsDataURL(file);
     // Reset input
     e.target.value = '';
-  }, [syllabus, setSyllabus, toast]);
+  }, [syllabus, setSyllabus, toast, moduleId]);
 
   // ─── Sample chapters from common French university syllabi ───
   const handleLoadSampleChapters = useCallback(() => {
@@ -555,7 +587,7 @@ export function SyllabusTracker({ syllabus: syllabusProp, setSyllabus, moduleNam
   };
 
   const handleRemovePdf = async () => {
-    try { await savePdfToIDB(null); } catch { /* ignore */ }
+    try { await savePdfToIDB(pdfKey(moduleId), null); } catch { /* ignore */ }
     if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
     setPdfBlobUrl(null);
     setPdfDataUrl(null);

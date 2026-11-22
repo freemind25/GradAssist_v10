@@ -453,6 +453,7 @@ export function EvaluationModule({ module, onUpdate, onSave }: EvaluationModuleP
                         syllabus={module.evaluationData.syllabus}
                         setSyllabus={(value) => updateField('syllabus', value)}
                         moduleName={module.name}
+                        moduleId={module.id}
                     />
                 )}
 
