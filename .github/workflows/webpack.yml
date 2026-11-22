@@ -1,14 +1,37 @@
 name: GradeAssist CI
 
+# Vérifications exécutées sur chaque push vers main et sur chaque PR.
+# Objectif : empêcher qu'un code qui ne compile pas, ou qui casse les types,
+# atteigne main — c'est la cause directe de la série de correctifs
+# « écran blanc » de septembre 2026.
+
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
+
+# Le workflow ne fait que lire le dépôt : aucun droit d'écriture nécessaire.
+permissions:
+  contents: read
+
+# Un nouveau push annule la vérification précédente devenue obsolète :
+# économise des minutes et évite deux runs concurrents sur la même branche.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  # Cypress télécharge un binaire de ~250 Mo à l'installation ; les tests E2E
+  # ne tournent pas ici, donc inutile de le récupérer.
+  CYPRESS_INSTALL_BINARY: "0"
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -18,17 +41,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20.18.0'
+          # Le cache npm est indexé sur package-lock.json : les installations
+          # suivantes passent de plusieurs minutes à quelques secondes.
+          cache: 'npm'
 
+      # npm ci (et non npm install) : installe exactement le lockfile et
+      # échoue si package.json et package-lock.json divergent, au lieu de
+      # résoudre silencieusement une version différente à chaque run.
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
-        env:
-          CYPRESS_INSTALL_BINARY: 0
-          NEXT_TELEMETRY_DISABLED: 1
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
 
-      - name: TypeScript check
-        run: npx tsc --noEmit
+      - name: Type check
+        run: npm run typecheck
 
-      - name: Next.js build
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
         run: npm run build
-        env:
-          NEXT_TELEMETRY_DISABLED: 1
