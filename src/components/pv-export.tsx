@@ -4,7 +4,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Button } from "@/components/ui/button";
 import { FileDown } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { canExportFiles, notifyDownloadStarted } from "@/lib/export-guard";
 import type { EvaluationData } from "@/types";
 
 interface PvExportProps {
@@ -13,8 +13,6 @@ interface PvExportProps {
 }
 
 export function PvExport({ evaluationData, moduleName }: PvExportProps) {
-  const { toast } = useToast();
-
   const generatePv = () => {
     const d = evaluationData;
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
@@ -260,13 +258,11 @@ export function PvExport({ evaluationData, moduleName }: PvExportProps) {
     }
 
     // ── Save ──
-    const filename = `PV_notes_${moduleName.replace(/\s/g, "_")}_${d.academicYear || "2025-2026"}.pdf`;
+    if (!canExportFiles()) return;
+    const annee = (d.academicYear || "annee").replace(/\//g, "-");
+    const filename = `PV_notes_${moduleName.replace(/\s/g, "_")}_${annee}.pdf`;
     doc.save(filename);
-
-    toast({
-      title: "PV Exporté",
-      description: `Le fichier "${filename}" a été téléchargé.`,
-    });
+    notifyDownloadStarted(filename);
   };
 
   return (
