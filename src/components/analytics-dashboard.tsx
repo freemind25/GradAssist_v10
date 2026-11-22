@@ -66,7 +66,7 @@ export function AnalyticsDashboard({ evaluationData, allSavedEvaluations, module
       if (range) range.count++;
     });
     return ranges;
-  }, [d, allSavedEvaluations]);
+  }, [d, allSavedEvaluations, maxPoints]);
 
   // ── 2. Criteria Average (bar chart) ──
   // `selectedGrades` contient des POINTS (ex. "3.5"), pas un nom de palier :

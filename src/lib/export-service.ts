@@ -6,7 +6,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Criterion, SelectedGrades, EvaluationData } from "@/types";
 import { toast } from "@/hooks/use-toast";
-import { canExportFiles, notifyDownloadStarted } from "@/lib/export-guard";
+import { saveDocument } from "@/lib/export-guard";
 
 const NON_NOTE_VALUE = "__NONE__";
 const BASE_DOCUMENT_TITLE_PREFIX = "Fiche d'évaluation des travaux de l'atelier";
@@ -86,20 +86,8 @@ const addLogoToPDF = (doc: jsPDF, logo: string, yPos: number, pageWidth: number,
   }
 };
 
-const downloadFile = (content: string, filename: string): void => {
-  // BOM UTF-8 : sans lui, Excel affiche « Ã© » à la place de « é ».
-  // Un Blob évite aussi la troncature des URL contenant « # », que
-  // `encodeURI` ne neutralise pas.
-  const blob = new Blob(["\uFEFF", content], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute("download", filename);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-};
+// Le téléchargement lui-même est délégué à `saveDocument` (export-guard), qui
+// sait écrire sur l'appareil quand l'application tourne dans la WebView Android.
 
 // [SEC-03] Sanitizer anti-formula injection CSV/Excel.
 // Un attaquant peut saisir un nom d'étudiant commençant par =, +, -, @, TAB
@@ -125,7 +113,7 @@ function csvCell(value: string | undefined | null): string {
   return `"${sanitizeCsvCell(value)}"`;
 }
 
-export const exportIndividualCSV = (params: ExportIndividualParams): void => {
+export const exportIndividualCSV = async (params: ExportIndividualParams): Promise<void> => {
   const { criteria, selectedGrades, studentNames, teacherNames, projectName, studyLevel, studySubLevel, session, academicYear, universityName, establishmentName, departmentName, masterSpecialty, universityLogo, totalPoints, maxTotalPoints, evaluationSheetTitleComplement } = params;
 
   // Plus de préfixe « data:text/csv » : downloadFile écrit un Blob, le préfixe
@@ -149,13 +137,14 @@ export const exportIndividualCSV = (params: ExportIndividualParams): void => {
   });
 
   csv += `\nTotal des Points,""," ",${totalPoints.toFixed(2)}\nSur,""," ",${maxTotalPoints.toFixed(2)}\n`;
-  if (!canExportFiles()) return;
   const fileName = `evaluation_${generateFileNameBase(studentNames)}.csv`;
-  downloadFile(csv, fileName);
-  notifyDownloadStarted(fileName);
+  await saveDocument(
+    fileName,
+    new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" })
+  );
 };
 
-export const exportSummaryCSV = (params: ExportSummaryParams): void => {
+export const exportSummaryCSV = async (params: ExportSummaryParams): Promise<void> => {
   const { allEvaluations, maxTotalPoints, moduleName } = params;
 
   if (allEvaluations.length === 0) {
@@ -190,13 +179,14 @@ export const exportSummaryCSV = (params: ExportSummaryParams): void => {
     ].join(',') + '\n';
   });
 
-  if (!canExportFiles()) return;
   const fileName = `${generateSummaryFileNameBase(moduleName)}.csv`;
-  downloadFile(csv, fileName);
-  notifyDownloadStarted(fileName);
+  await saveDocument(
+    fileName,
+    new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" })
+  );
 };
 
-export const exportIndividualPDF = (params: ExportIndividualParams): void => {
+export const exportIndividualPDF = async (params: ExportIndividualParams): Promise<void> => {
   const { criteria, selectedGrades, studentNames, teacherNames, projectName, studyLevel, studySubLevel, session, academicYear, universityName, establishmentName, departmentName, masterSpecialty, universityLogo, totalPoints, maxTotalPoints, evaluationSheetTitleComplement } = params;
 
   const doc = new jsPDF();
@@ -248,13 +238,11 @@ export const exportIndividualPDF = (params: ExportIndividualParams): void => {
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.text(`Note Finale: ${totalPoints.toFixed(2)} / ${maxTotalPoints.toFixed(2)}`, pageMargin, finalY + 10);
-  if (!canExportFiles()) return;
   const pdfFileName = `evaluation_${generateFileNameBase(studentNames)}.pdf`;
-  doc.save(pdfFileName);
-  notifyDownloadStarted(pdfFileName);
+  await saveDocument(pdfFileName, doc.output("blob"));
 };
 
-export const exportSummaryPDF = (params: ExportSummaryParams): void => {
+export const exportSummaryPDF = async (params: ExportSummaryParams): Promise<void> => {
   const { allEvaluations, maxTotalPoints, moduleName } = params;
 
   if (allEvaluations.length === 0) {
@@ -316,8 +304,6 @@ export const exportSummaryPDF = (params: ExportSummaryParams): void => {
     columnStyles: { 0: { cellWidth: 8, halign: 'center' as const }, 1: { cellWidth: 40, halign: 'left' as const }, 2: { cellWidth: 40, halign: 'left' as const }, 3: { cellWidth: 'auto' as const, halign: 'left' as const }, 4: { cellWidth: 18, halign: 'center' as const }, 5: { cellWidth: 20, halign: 'left' as const }, 6: { cellWidth: 10, halign: 'center' as const }, 7: { cellWidth: 16, halign: 'center' as const }, 8: { cellWidth: 15, halign: 'center' as const, fontStyle: 'bold' as const } },
   });
 
-  if (!canExportFiles()) return;
   const summaryFileName = `${generateSummaryFileNameBase(moduleName)}.pdf`;
-  doc.save(summaryFileName);
-  notifyDownloadStarted(summaryFileName);
+  await saveDocument(summaryFileName, doc.output("blob"));
 };
