@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { BarChart3, Users, TrendingUp, AlertTriangle, Award, Target } from "lucide-react";
 import type { EvaluationData } from "@/types";
-import { gradeLevels, TARGET_SUM_COEFFICIENTS } from "@/config/grading-config";
+import { TARGET_SUM_COEFFICIENTS } from "@/config/grading-config";
 
 interface AnalyticsDashboardProps {
   evaluationData: EvaluationData;
@@ -58,25 +58,32 @@ export function AnalyticsDashboard({ evaluationData, allSavedEvaluations, module
     const allEvals = allSavedEvaluations.length > 0 ? allSavedEvaluations : [d];
     allEvals.forEach((e) => {
       const pts = e.totalPoints ?? 0;
-      const range = ranges.find((r) => pts >= r.min && pts < r.max);
+      // La dernière tranche est fermée à droite : sans cela, une note de 20/20
+      // n'appartenait à aucun bac et disparaissait de la distribution.
+      const range = ranges.find(
+        (r) => pts >= r.min && (pts < r.max || (r.max === maxPoints && pts === maxPoints))
+      );
       if (range) range.count++;
     });
     return ranges;
   }, [d, allSavedEvaluations]);
 
   // ── 2. Criteria Average (bar chart) ──
+  // `selectedGrades` contient des POINTS (ex. "3.5"), pas un nom de palier :
+  // l'ancienne comparaison `gradeLevels.find(g => g.name === grade)` ne pouvait
+  // jamais aboutir, d'où des graphiques invariablement à zéro.
   const criteriaAverage = useMemo(() => {
     return d.criteria.map((c) => {
-      const grade = d.selectedGrades[c.id];
-      const gradeLevel = gradeLevels.find((g) => g.name === grade);
-      const points = gradeLevel ? gradeLevel.pointsFactor * c.coefficient : 0;
+      const raw = d.selectedGrades[c.id];
+      const parsed = raw && raw !== "__NONE__" ? Number.parseFloat(raw) : Number.NaN;
+      const value = Number.isFinite(parsed) ? parsed : 0;
       const maxPossible = c.coefficient;
       return {
         name: c.name.length > 18 ? c.name.substring(0, 16) + "…" : c.name,
         fullName: c.name,
-        notes: points,
+        notes: value,
         max: maxPossible,
-        pourcentage: maxPossible > 0 ? Math.round((points / maxPossible) * 100) : 0,
+        pourcentage: maxPossible > 0 ? Math.round((value / maxPossible) * 100) : 0,
       };
     });
   }, [d.criteria, d.selectedGrades]);
@@ -84,13 +91,13 @@ export function AnalyticsDashboard({ evaluationData, allSavedEvaluations, module
   // ── 3. Radar chart (student profile) ──
   const radarData = useMemo(() => {
     return d.criteria.map((c) => {
-      const grade = d.selectedGrades[c.id];
-      const gradeLevel = gradeLevels.find((g) => g.name === grade);
-      const points = gradeLevel ? gradeLevel.pointsFactor * c.coefficient : 0;
+      const raw = d.selectedGrades[c.id];
+      const parsed = raw && raw !== "__NONE__" ? Number.parseFloat(raw) : Number.NaN;
+      const value = Number.isFinite(parsed) ? parsed : 0;
       const maxPossible = c.coefficient;
       return {
         critere: c.name.length > 14 ? c.name.substring(0, 12) + "…" : c.name,
-        valeur: maxPossible > 0 ? Math.round((points / maxPossible) * 100) : 0,
+        valeur: maxPossible > 0 ? Math.round((value / maxPossible) * 100) : 0,
         fullMark: 100,
       };
     });
