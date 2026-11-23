@@ -62,21 +62,37 @@ export async function saveDocument(fileName: string, data: Blob): Promise<void> 
     const { Share } = await import("@capacitor/share");
 
     const base64 = await blobToBase64(data);
-    const written = await Filesystem.writeFile({
-      path: `GradeAssist/${fileName}`,
-      data: base64,
-      directory: Directory.Documents,
-      recursive: true,
-    });
+    const path = `GradeAssist/${fileName}`;
+
+    // Android 11+ interdit l'écriture dans le dossier Documents public :
+    // l'appel échoue avec une erreur de permission. On réessaie dans le cache
+    // applicatif, toujours accessible, puis on passe par la feuille de partage
+    // qui, elle, laisse l'utilisateur choisir la destination réelle.
+    let written;
+    try {
+      written = await Filesystem.writeFile({
+        path,
+        data: base64,
+        directory: Directory.Documents,
+        recursive: true,
+      });
+    } catch {
+      written = await Filesystem.writeFile({
+        path,
+        data: base64,
+        directory: Directory.Cache,
+        recursive: true,
+      });
+    }
 
     toast({
-      title: "Document enregistré",
-      description: `${fileName} — dossier Documents/GradeAssist de votre téléphone.`,
+      title: "Document prêt",
+      description: `${fileName} — utilisez le partage pour l'enregistrer dans vos fichiers, votre Drive ou un mail.`,
     });
 
-    // La feuille de partage permet d'envoyer le fichier ailleurs (Drive, mail)
-    // ou de le copier dans un autre dossier. Un refus de l'utilisateur n'est
-    // pas une erreur : le fichier reste dans Documents/GradeAssist.
+    // La feuille de partage sert de « Enregistrer sous ». Un refus de
+    // l'utilisateur n'est pas une erreur : le document reste disponible dans
+    // le cache de l'application jusqu'au prochain nettoyage du système.
     try {
       await Share.share({
         title: fileName,
