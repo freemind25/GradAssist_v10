@@ -30,6 +30,16 @@ function triggerBrowserDownload(blob: Blob, fileName: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
+export interface ShareOptions {
+  /** Titre du document (objet du mail sur Android). */
+  title: string;
+  /** Texte accompagnant le partage. */
+  text?: string;
+  /** Destinataire du repli `mailto:` sur le web. */
+  mailTo?: string;
+  dialogTitle?: string;
+}
+
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -109,6 +119,93 @@ export async function saveDocument(fileName: string, data: Blob): Promise<void> 
       title: "Enregistrement impossible",
       description:
         "Le document n'a pas pu être écrit sur l'appareil. Vérifiez l'espace disponible, ou ouvrez GradeAssist dans Chrome pour télécharger.",
+    });
+  }
+}
+
+/**
+ * Partage le document (e-mail, Drive, messagerie).
+ *
+ * Sur Android, la feuille de partage reçoit le **fichier lui-même** : Gmail
+ * s'ouvre avec la pièce jointe réelle. C'est la seule façon d'envoyer un PDF
+ * depuis une application web — un lien `mailto:` ne transporte que du texte.
+ *
+ * Sur le web, `navigator.share` fait de même quand il accepte des fichiers ;
+ * sinon le document est téléchargé et un message explique qu'il faut le
+ * joindre manuellement.
+ */
+export async function shareDocument(
+  fileName: string,
+  data: Blob,
+  options: ShareOptions
+): Promise<void> {
+  if (!isNativeShell()) {
+    const file = new File([data], fileName, { type: data.type || "application/pdf" });
+    const nav = navigator as Navigator & {
+      canShare?: (payload: ShareData) => boolean;
+      share?: (payload: ShareData) => Promise<void>;
+    };
+
+    if (nav.share && nav.canShare?.({ files: [file] })) {
+      try {
+        await nav.share({ files: [file], title: options.title, text: options.text });
+        return;
+      } catch {
+        return; // partage annulé par l'utilisateur
+      }
+    }
+
+    triggerBrowserDownload(data, fileName);
+    if (options.mailTo) {
+      const params = new URLSearchParams({ subject: options.title });
+      if (options.text) params.set("body", options.text);
+      window.open(`mailto:${options.mailTo}?${params.toString()}`, "_blank");
+    }
+    toast({
+      title: "Fichier téléchargé",
+      description:
+        "Un lien mailto ne peut pas transporter de pièce jointe : joignez le document téléchargé à votre message.",
+    });
+    return;
+  }
+
+  try {
+    const { Directory, Filesystem } = await import("@capacitor/filesystem");
+    const { Share } = await import("@capacitor/share");
+
+    const base64 = await blobToBase64(data);
+    const path = `GradeAssist/${fileName}`;
+
+    let written;
+    try {
+      written = await Filesystem.writeFile({
+        path,
+        data: base64,
+        directory: Directory.Documents,
+        recursive: true,
+      });
+    } catch {
+      written = await Filesystem.writeFile({
+        path,
+        data: base64,
+        directory: Directory.Cache,
+        recursive: true,
+      });
+    }
+
+    await Share.share({
+      title: options.title,
+      text: options.text,
+      url: written.uri,
+      dialogTitle: options.dialogTitle ?? "Envoyer le document",
+    });
+  } catch (error) {
+    console.error("Échec du partage du document :", error);
+    toast({
+      variant: "destructive",
+      title: "Envoi impossible",
+      description:
+        "Le document n'a pas pu être préparé. Essayez de l'enregistrer d'abord, puis de le joindre depuis votre messagerie.",
     });
   }
 }
