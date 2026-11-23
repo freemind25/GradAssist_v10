@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { saveDocument } from "@/lib/export-guard";
+import { saveDocument, shareDocument } from "@/lib/export-guard";
 import { CheckCircle2, XCircle, Clock, FileText, UserCheck, Download, Calendar as CalendarIcon, FileBarChart, Mail, Send } from "lucide-react";
 import type { AttendanceData, AttendanceStatus } from "@/types";
 import { cn } from '@/lib/utils';
@@ -197,10 +197,12 @@ export function AttendanceRegistry({
         );
     };
 
-    const handleExportPDF = async (concise: boolean) => {
+    // Construit le PDF du registre, sans l'enregistrer : le même document sert
+    // à l'export (saveDocument) et à l'envoi par e-mail (shareDocument).
+    const buildAttendancePdf = (concise: boolean): { doc: jsPDF; fileName: string } | null => {
         if (!selectedDate) {
             toast({ variant: "destructive", title: "Aucune Date", description: "Veuillez sélectionner une date." });
-            return;
+            return null;
         }
         const { studentReports, recordedDays, month, year } = getMonthlyReportData(getMonth(selectedDate), getYear(selectedDate), concise);
         const monthName = format(new Date(year, month, 1), 'MMMM yyyy', { locale: fr });
@@ -208,11 +210,11 @@ export function AttendanceRegistry({
 
         if (studentReports.length === 0 || !students.some(s => s.trim())) {
             toast({ variant: "destructive", title: "Aucune Donnée", description: "Le registre de présence est vide pour ce mois ou aucun étudiant n'est inscrit." });
-            return;
+            return null;
         }
         if (concise && recordedDays.length === 0) {
             toast({ variant: "destructive", title: "Aucune Donnée", description: "Aucune absence, retard ou excuse enregistrée pour ce mois. Le rapport concis est vide." });
-            return;
+            return null;
         }
 
         const doc = new jsPDF({ orientation: 'landscape' });
@@ -360,7 +362,13 @@ export function AttendanceRegistry({
         doc.text("Légende: P = Présent, A = Absent, R = Retard, E = Excusé", pageMargin, finalY + 8);
 
         const pdfFileName = `rapport_absences_${year}_${String(month + 1).padStart(2, '0')}${concise ? '_concis' : ''}.pdf`;
-        await saveDocument(pdfFileName, doc.output('blob'));
+        return { doc, fileName: pdfFileName };
+    };
+
+    const handleExportPDF = async (concise: boolean) => {
+        const built = buildAttendancePdf(concise);
+        if (!built) return;
+        await saveDocument(built.fileName, built.doc.output('blob'));
     };
 
     // ── Email helpers ──────────────────────────────────────────────────
@@ -416,7 +424,7 @@ export function AttendanceRegistry({
         return text;
     };
 
-    const sendReportByEmail = (concise: boolean) => {
+    const sendReportByEmail = async (concise: boolean) => {
         if (!selectedDate) {
             toast({ variant: "destructive", title: "Aucune Date", description: "Veuillez sélectionner une date." });
             return;
@@ -438,15 +446,16 @@ export function AttendanceRegistry({
             return;
         }
 
-        const reportText = generateReportText(concise);
-        const subject = `Rapport d'absences - ${moduleName || 'Matière'} - ${monthName}`;
+        const built = buildAttendancePdf(concise);
+        if (!built) return;
 
-        const mailtoUrl = `mailto:${encodeURIComponent(adminEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(reportText)}`;
-        window.open(mailtoUrl, "_blank");
-
-        toast({
-            title: "Email préparé",
-            description: `Le client email s'ouvre avec le rapport. Joignez le fichier PDF exporté si besoin.`,
+        // Le PDF est joint au message : un lien mailto ne transporte que du
+        // texte, ce qui expliquait qu'aucune pièce jointe n'arrivait.
+        await shareDocument(built.fileName, built.doc.output('blob'), {
+            title: `Rapport d'absences - ${moduleName || 'Matière'} - ${monthName}`,
+            text: generateReportText(concise),
+            mailTo: adminEmail,
+            dialogTitle: "Envoyer le rapport d'absences",
         });
     };
 
