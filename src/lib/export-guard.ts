@@ -106,7 +106,10 @@ export async function saveDocument(fileName: string, data: Blob): Promise<void> 
     try {
       await Share.share({
         title: fileName,
-        url: written.uri,
+        // `files` est le seul champ qui joint réellement le fichier : `url`
+        // transmet un lien, que Gmail affiche comme du texte (« fichier
+        // introuvable » ou simple mention du nom).
+        files: [written.uri],
         dialogTitle: "Enregistrer ou partager le document",
       });
     } catch {
@@ -196,7 +199,7 @@ export async function shareDocument(
     await Share.share({
       title: options.title,
       text: options.text,
-      url: written.uri,
+      files: [written.uri],
       dialogTitle: options.dialogTitle ?? "Envoyer le document",
     });
   } catch (error) {
