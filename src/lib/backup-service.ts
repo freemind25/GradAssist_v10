@@ -169,6 +169,11 @@ function normalizeModule(raw: unknown, index: number): EvaluationModule {
       tutoringSessions: Array.isArray(typed.tutoringSessions)
         ? typed.tutoringSessions
         : [],
+      // Sauvegardes antérieures à l'ajout des résultats : on repart d'un tableau
+      // vide plutôt que de laisser le champ indéfini.
+      studentResults: Array.isArray(typed.studentResults)
+        ? typed.studentResults
+        : [],
     },
   };
 }

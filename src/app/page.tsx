@@ -110,6 +110,7 @@ const getNewEvaluationModule = (type: ModuleType, name: string): EvaluationModul
       quickNotes: [],
       workGroups: [],
       tutoringSessions: [],
+      studentResults: [],
       atRiskConfig: { attendanceThreshold: 75, gradeThreshold: 10 },
       continuousAssessmentGrade: (type === 'standard' || type === 'mooc') ? 10 : undefined,
       examGrade: (type === 'standard' || type === 'mooc') ? 10 : undefined,

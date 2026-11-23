@@ -3,7 +3,7 @@
 
 import type * as React from 'react';
 import { useCallback, useState, useMemo } from 'react';
-import type { EvaluationModule as EvaluationModuleType, EvaluationData, Criterion } from '@/types';
+import type { EvaluationModule as EvaluationModuleType, EvaluationData, Criterion, StudentResult, StudentResultCriterion } from '@/types';
 import { StudentProjectInfoForm } from '@/components/student-project-info-form';
 import { GradeTable } from '@/components/grade-table';
 import { StandardModuleForm } from '@/components/standard-module-form';
@@ -11,6 +11,7 @@ import { ExportButtons } from '@/components/export-buttons';
 import { Button } from '@/components/ui/button';
 import { gradeLevels, TARGET_SUM_COEFFICIENTS, DEFAULT_CRITERIA } from '@/config/grading-config';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertCircle, AlertTriangle, BarChart3, BookOpen, FilePlus2, FileText, GraduationCap, MinusCircle, PlusCircle, Route, Settings, UserCheck, UserPlus, Users } from 'lucide-react';
 import { AttendanceRegistry } from './attendance-registry';
 import { ThesisSupervision } from './thesis-supervision';
@@ -40,6 +41,9 @@ export function EvaluationModule({ module, onUpdate, onSave }: EvaluationModuleP
     const { toast } = useToast();
     const [activeTab, setActiveTab] = useState<SidebarTab>('evaluation');
     const [allSavedEvaluations, setAllSavedEvaluations] = useState<EvaluationData[]>([]);
+    // Résultat en attente de vérification : rien n'est enregistré tant que
+    // l'utilisateur n'a pas validé l'écran de consultation.
+    const [pendingReview, setPendingReview] = useState<StudentResult | null>(null);
 
     // Ensure backwards compatibility for new fields
     const thesisStudents = module.evaluationData.thesisStudents ?? [];
@@ -83,18 +87,79 @@ export function EvaluationModule({ module, onUpdate, onSave }: EvaluationModuleP
         return module.evaluationData.criteria.reduce((sum, criterion) => sum + criterion.coefficient, 0);
     }, [module.type, module.evaluationData.criteria]);
 
-    const handleAddToSummaryAndReset = () => {
-        // Create a snapshot of the current evaluation data
-        const evaluationSnapshot: EvaluationData = { ...module.evaluationData };
-        
-        // Add to the summary list
-        const newSummary = [...allSavedEvaluations, evaluationSnapshot];
-        setAllSavedEvaluations(newSummary);
+    const studentResults = useMemo(
+        () => module.evaluationData.studentResults ?? [],
+        [module.evaluationData.studentResults]
+    );
 
-        // Create a fresh default evaluation data object
-        const newId = `eval_${Date.now()}`;
+    /** Construit le résultat de l'étudiant courant, sans rien enregistrer. */
+    const buildStudentResult = useCallback((): StudentResult | null => {
+        const d = module.evaluationData;
+        const studentName = d.studentNames.map((n) => n.trim()).filter(Boolean).join(" & ");
+
+        if (!studentName) {
+            toast({
+                variant: "destructive",
+                title: "Étudiant manquant",
+                description: "Renseignez au moins un nom d'étudiant avant d'enregistrer un résultat.",
+            });
+            return null;
+        }
+
+        if (module.type === 'atelier') {
+            const criteria: StudentResultCriterion[] = d.criteria.map((c) => {
+                const raw = d.selectedGrades[c.id];
+                const hasGrade = Boolean(raw) && raw !== "__NONE__";
+                const points = hasGrade ? Number.parseFloat(raw as string) : 0;
+                return {
+                    criterionId: c.id,
+                    name: c.name,
+                    coefficient: c.coefficient,
+                    grade: hasGrade ? (raw as string) : "",
+                    points: Number.isFinite(points) ? points : 0,
+                };
+            });
+
+            return {
+                id: `res_${Date.now()}`,
+                studentName,
+                moduleType: module.type,
+                totalPoints: d.totalPoints,
+                maxPoints: TARGET_SUM_COEFFICIENTS,
+                criteria,
+                savedAt: new Date().toISOString(),
+            };
+        }
+
+        // Matière classique / MOOC : note finale = CC × poids + Examen × (1 − poids)
+        const cc = d.continuousAssessmentGrade ?? 0;
+        const exam = d.examGrade ?? 0;
+        const weight = d.continuousAssessmentWeight ?? 40;
+        const finalGrade = cc * (weight / 100) + exam * ((100 - weight) / 100);
+
+        return {
+            id: `res_${Date.now()}`,
+            studentName,
+            moduleType: module.type,
+            totalPoints: finalGrade,
+            maxPoints: 20,
+            continuousAssessment: cc,
+            exam,
+            continuousAssessmentWeight: weight,
+            savedAt: new Date().toISOString(),
+        };
+    }, [module, toast]);
+
+    /** Étape 1 : ouvre l'écran de vérification, sans écrire quoi que ce soit. */
+    const handlePrepareResult = useCallback(() => {
+        const result = buildStudentResult();
+        if (result) setPendingReview(result);
+    }, [buildStudentResult]);
+
+    /** Étape 3 : réinitialise le formulaire pour la saisie suivante. */
+    const resetEvaluationForm = useCallback(() => {
         const defaultData: Partial<EvaluationData> = {
-            id: newId,
+            id: `eval_${Date.now()}`,
             studentNames: [""],
             projectName: "",
             selectedGrades: {},
@@ -116,12 +181,28 @@ export function EvaluationModule({ module, onUpdate, onSave }: EvaluationModuleP
         };
 
         onUpdate(defaultData);
+    }, [module.evaluationData, onUpdate]);
+
+    /** Étape 2 : validation depuis l'écran de consultation. */
+    const confirmResult = useCallback(() => {
+        if (!pendingReview) return;
+
+        // Un même étudiant ne doit avoir qu'un résultat : une nouvelle
+        // validation corrige le précédent au lieu de le dupliquer.
+        const others = studentResults.filter((r) => r.studentName !== pendingReview.studentName);
+        onUpdate({ studentResults: [...others, pendingReview] });
+
+        // La synthèse en mémoire reste alimentée pour les exports existants.
+        setAllSavedEvaluations((prev) => [...prev, { ...module.evaluationData }]);
+
+        resetEvaluationForm();
+        setPendingReview(null);
 
         toast({
-            title: "Évaluation Ajoutée à la Synthèse",
-            description: "Le formulaire a été réinitialisé pour une nouvelle saisie.",
+            title: "Résultat enregistré",
+            description: `${pendingReview.studentName} — ${pendingReview.totalPoints.toFixed(2)} / ${pendingReview.maxPoints}.`,
         });
-    };
+    }, [pendingReview, studentResults, onUpdate, module.evaluationData, resetEvaluationForm, toast]);
 
     const gradePercentage = useMemo(() => {
         if (module.type !== 'atelier') return 0;
@@ -411,13 +492,13 @@ export function EvaluationModule({ module, onUpdate, onSave }: EvaluationModuleP
                                     Synthèse des Évaluations
                                 </CardTitle>
                                 <CardDescription>
-                                    Ajoutez l&apos;évaluation actuelle à la synthèse, puis réinitialisez pour une nouvelle saisie.
+                                    Vérifiez le résultat de l&apos;étudiant avant de l&apos;enregistrer définitivement, puis réinitialisez pour la saisie suivante.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="flex flex-wrap items-center gap-4">
-                                 <Button onClick={handleAddToSummaryAndReset} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                                 <Button onClick={handlePrepareResult} className="bg-accent hover:bg-accent/90 text-accent-foreground">
                                     <FilePlus2 className="mr-2 h-4 w-4" />
-                                    Ajouter à la Synthèse et Réinitialiser
+                                    Vérifier et enregistrer
                                 </Button>
                                  {allSavedEvaluations.length > 0 && (
                                     <SummaryExportButtons
@@ -425,6 +506,11 @@ export function EvaluationModule({ module, onUpdate, onSave }: EvaluationModuleP
                                         maxTotalPoints={TARGET_SUM_COEFFICIENTS}
                                         moduleName={module.name}
                                     />
+                                )}
+                                {studentResults.length > 0 && (
+                                    <p className="text-sm text-muted-foreground">
+                                        {studentResults.length} résultat(s) enregistré(s) pour ce module
+                                    </p>
                                 )}
                             </CardContent>
                              {allSavedEvaluations.length > 0 && (
@@ -436,6 +522,88 @@ export function EvaluationModule({ module, onUpdate, onSave }: EvaluationModuleP
                                 </CardFooter>
                             )}
                         </Card>
+
+                        {/* Écran de vérification : rien n'est écrit avant validation */}
+                        <Dialog
+                            open={pendingReview !== null}
+                            onOpenChange={(open) => {
+                                if (!open) setPendingReview(null);
+                            }}
+                        >
+                            <DialogContent className="max-w-lg">
+                                <DialogHeader>
+                                    <DialogTitle>Vérifier avant enregistrement</DialogTitle>
+                                    <DialogDescription>
+                                        Contrôlez le résultat ci-dessous. Aucune donnée n&apos;est enregistrée tant que vous n&apos;avez pas validé.
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                {pendingReview && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-baseline justify-between rounded-lg border bg-muted/30 px-4 py-3">
+                                            <div>
+                                                <p className="text-sm text-muted-foreground">Étudiant</p>
+                                                <p className="font-semibold">{pendingReview.studentName}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm text-muted-foreground">Note</p>
+                                                <p className="text-2xl font-bold text-accent">
+                                                    {pendingReview.totalPoints.toFixed(2)}
+                                                    <span className="text-sm font-normal text-muted-foreground"> / {pendingReview.maxPoints}</span>
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {pendingReview.criteria && pendingReview.criteria.length > 0 && (
+                                            <div className="max-h-64 overflow-y-auto rounded-lg border">
+                                                <table className="w-full text-sm">
+                                                    <thead className="bg-muted/50 text-left">
+                                                        <tr>
+                                                            <th className="px-3 py-2">Critère</th>
+                                                            <th className="px-3 py-2 text-center">Coeff.</th>
+                                                            <th className="px-3 py-2 text-center">Note</th>
+                                                            <th className="px-3 py-2 text-center">Points</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {pendingReview.criteria.map((c) => (
+                                                            <tr key={c.criterionId} className="border-t">
+                                                                <td className="px-3 py-1.5">{c.name}</td>
+                                                                <td className="px-3 py-1.5 text-center">{c.coefficient}</td>
+                                                                <td className="px-3 py-1.5 text-center">{c.grade || "—"}</td>
+                                                                <td className="px-3 py-1.5 text-center">{c.points.toFixed(2)}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+
+                                        {pendingReview.moduleType !== 'atelier' && (
+                                            <div className="space-y-1 rounded-lg border bg-muted/30 px-4 py-3 text-sm">
+                                                <p>
+                                                    Note CC : <strong>{(pendingReview.continuousAssessment ?? 0).toFixed(2)}</strong>
+                                                    <span className="text-muted-foreground"> (poids {pendingReview.continuousAssessmentWeight ?? 40} %)</span>
+                                                </p>
+                                                <p>
+                                                    Note examen : <strong>{(pendingReview.exam ?? 0).toFixed(2)}</strong>
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <DialogFooter className="gap-2">
+                                    <Button variant="outline" onClick={() => setPendingReview(null)}>
+                                        Modifier
+                                    </Button>
+                                    <Button onClick={confirmResult}>
+                                        <Save className="mr-2 h-4 w-4" />
+                                        Enregistrer le résultat
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </>
                 )}
 
