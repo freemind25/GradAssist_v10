@@ -47,13 +47,43 @@ export interface ThesisStudent {
 }
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
-
 export interface AttendanceRecord {
   [studentName: string]: AttendanceStatus; // Key is the student's name
 }
 
 export interface AttendanceData {
   [date: string]: AttendanceRecord; // e.g., { '2024-05-21': { 'John Doe': 'present' } }
+}
+
+// ─── Résultats validés, un par étudiant ───
+// Le résultat est produit à l'issue de l'écran de vérification : c'est lui qui
+// alimente le PV, la détection des étudiants à risque et les exports de
+// synthèse. Il est persisté avec le module, contrairement à l'ancienne
+// « synthèse » qui ne vivait qu'en mémoire et disparaissait au rechargement.
+export interface StudentResultCriterion {
+  criterionId: string;
+  name: string;
+  coefficient: number;
+  grade: string;
+  points: number;
+}
+
+export interface StudentResult {
+  id: string;
+  studentName: string;
+  moduleType: ModuleType;
+  /** Points obtenus (atelier) ou note finale sur 20 (standard). */
+  totalPoints: number;
+  /** Barème de référence : 20 par défaut. */
+  maxPoints: number;
+  /** Détail par critère — atelier uniquement. */
+  criteria?: StudentResultCriterion[];
+  /** Matière classique uniquement. */
+  continuousAssessment?: number;
+  exam?: number;
+  continuousAssessmentWeight?: number;
+  /** Date de validation (ISO). */
+  savedAt: string;
 }
 
 // Represents the data for a single, complete evaluation form.
@@ -104,6 +134,9 @@ export interface EvaluationData {
 
   // Tutorat
   tutoringSessions: TutoringSession[];
+
+  // Résultats validés (un par étudiant), persistés avec le module
+  studentResults: StudentResult[];
 }
 
 export type ChapterStatus = 'not_started' | 'in_progress' | 'completed';
