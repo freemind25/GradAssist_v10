@@ -81,3 +81,6 @@ android/app/gradeassist-release.keystore
 # ── Journaux de session d'assistant IA ────────────────────────────────
 # Contiennent des extraits de commandes et parfois des clés API.
 SESSION_MEMORY.md
+
+# Build statique Capacitor : reliquat de src/app/api mis de côté
+.api-export-stash/
