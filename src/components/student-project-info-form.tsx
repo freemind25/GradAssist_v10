@@ -231,7 +231,7 @@ export function StudentProjectInfoForm({
     const file = event.target.files?.[0];
     if (file) {
       // [SEC-08] Validation stricte : magic bytes + rejet SVG + taille 500 Ko max
-      const { validateImageFile, fileToDataUrl } = await import("@/lib/file-validation");
+      const { validateImageFile, fileToDataUrl, fileToPngDataUrl } = await import("@/lib/file-validation");
       const result = await validateImageFile(file);
       if (!result.valid) {
         toast({
@@ -243,17 +243,22 @@ export function StudentProjectInfoForm({
         return;
       }
       try {
-        const dataUrl = await fileToDataUrl(file);
+        // Le WebP est converti en PNG : jsPDF ne sait pas l'embarquer dans les rapports.
+        const isWebp = result.format === "webp";
+        const dataUrl = isWebp ? await fileToPngDataUrl(file) : await fileToDataUrl(file);
         setUniversityLogo(dataUrl);
         toast({
           title: "Logo importé",
-          description: `Le logo a été chargé (format ${result.format?.toUpperCase()}, ${(file.size / 1024).toFixed(0)} Ko).`,
+          description: isWebp
+            ? `Le logo WebP a été converti en PNG (${(file.size / 1024).toFixed(0)} Ko).`
+            : `Le logo a été chargé (format ${result.format?.toUpperCase()}, ${(file.size / 1024).toFixed(0)} Ko).`,
         });
       } catch (err) {
         toast({
           variant: "destructive",
           title: "Erreur de lecture",
-          description: "Impossible de lire le fichier sélectionné.",
+          description:
+            err instanceof Error ? err.message : "Impossible de lire le fichier sélectionné.",
         });
       }
     }
@@ -298,7 +303,7 @@ export function StudentProjectInfoForm({
               type="file"
               ref={logoInputRef}
               onChange={handleLogoFileChange}
-              accept="image/png, image/jpeg, image/gif"
+              accept="image/png, image/jpeg, image/gif, image/webp"
               style={{ display: 'none' }}
             />
             {universityLogo && (

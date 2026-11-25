@@ -8,13 +8,15 @@
  *
  * Politique :
  * - PNG, JPEG, GIF autorisés (formats raster sans risque XSS)
+ * - WebP autorisé puis **converti en PNG** avant stockage : jsPDF n'embarque
+ *   pas de WebP, et le PNG produit est toujours relisible par les rapports.
  * - SVG INTERDIT (peut contenir <script>, onload=, <foreignObject>)
  * - Taille max 500 Ko (vs 2 Mo actuellement — éviter saturation localStorage)
  *
  * Référence : OWASP File Upload Cheat Sheet
  */
 
-export type ImageFormat = "png" | "jpeg" | "gif";
+export type ImageFormat = "png" | "jpeg" | "gif" | "webp";
 
 export interface ValidationResult {
   valid: boolean;
@@ -39,7 +41,7 @@ const SIGNATURES: Array<{ format: ImageFormat; bytes: number[]; offset?: number 
 export const MAX_LOGO_SIZE_BYTES = 500 * 1024;
 
 // Extensions autorisées (pour validation préliminaire avant magic bytes)
-const ALLOWED_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif"];
+const ALLOWED_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
 
 /**
  * Lit les N premiers octets d'un fichier de manière asynchrone.
@@ -67,6 +69,18 @@ function matchSignature(header: Uint8Array, signature: number[]): boolean {
 function hasAllowedExtension(filename: string): boolean {
   const lower = filename.toLowerCase();
   return ALLOWED_EXTENSIONS.some(ext => lower.endsWith(ext));
+}
+
+/**
+ * WebP : conteneur RIFF. La signature est « RIFF » en tête puis « WEBP »
+ * à l'offset 8, ce qui ne rentre pas dans le format simple de SIGNATURES.
+ */
+function isWebp(header: Uint8Array): boolean {
+  return (
+    header.length >= 12 &&
+    header[0] === 0x52 && header[1] === 0x49 && header[2] === 0x46 && header[3] === 0x46 &&
+    header[8] === 0x57 && header[9] === 0x45 && header[10] === 0x42 && header[11] === 0x50
+  );
 }
 
 /**
@@ -122,7 +136,10 @@ export async function validateImageFile(file: File): Promise<ValidationResult> {
 
   // 5. Vérifier les magic bytes (validation finale anti-spoofing)
   try {
-    const header = await readFileHeader(file, 8);
+    const header = await readFileHeader(file, 12);
+    if (isWebp(header)) {
+      return { valid: true, format: "webp" };
+    }
     const matched = SIGNATURES.find(sig => matchSignature(header, sig.bytes));
     if (!matched) {
       return {
@@ -152,5 +169,40 @@ export function fileToDataUrl(file: File): Promise<string> {
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = () => reject(new Error("Erreur lors de la lecture du fichier."));
     reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Convertit une image (WebP notamment) en Data URL PNG, réduite à 512 px max.
+ *
+ * jsPDF n'embarque pas le WebP : sans cette conversion le rapport perdrait son
+ * logo. Le PNG produit est également plus léger à stocker dans localStorage.
+ */
+export async function fileToPngDataUrl(file: File): Promise<string> {
+  const dataUrl = await fileToDataUrl(file);
+  return new Promise<string>((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const naturalWidth = img.naturalWidth || 512;
+        const naturalHeight = img.naturalHeight || 512;
+        const scale = Math.min(1, 512 / Math.max(naturalWidth, naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(naturalHeight * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Canvas indisponible pour convertir le logo."));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/png"));
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error("Conversion du logo impossible."));
+      }
+    };
+    img.onerror = () => reject(new Error("Image illisible : conversion en PNG impossible."));
+    img.src = dataUrl;
   });
 }
