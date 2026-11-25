@@ -5,6 +5,7 @@ import { uploadToDrive, isDriveConnected } from '@/lib/google-drive-service';
 import { saveDocument, shareDocument } from '@/lib/export-guard';
 import { generatePedagogicalReportPDF } from '@/lib/pedagogical-report-pdf';
 import { toast } from '@/hooks/use-toast';
+import { getTeacher } from '@/components/teacher-login';
 import type { EvaluationData, ModuleType, SyllabusChapter, TutoringSession, TutoringSessionType, ThesisStudent } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -221,6 +222,32 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
     return content;
   };
 
+  /** Enseignant responsable : nom saisi dans le module, sinon profil connecté. */
+  const teacherName =
+    (evaluationData.teacherNames ?? []).map(n => n.trim()).filter(Boolean).join(', ') ||
+    getTeacher()?.fullName ||
+    'Non renseigné';
+
+  /** Période couverte : bornes des dates du canevas, des présences et des séances. */
+  const reportPeriod = (() => {
+    const raw: string[] = [];
+    for (const ch of flattenChapters(chapters)) {
+      if (ch.plannedDate) raw.push(ch.plannedDate);
+      if (ch.plannedEndDate) raw.push(ch.plannedEndDate);
+    }
+    raw.push(...Object.keys(evaluationData.attendance ?? {}));
+    for (const s of tutoringSessions) if (s.date) raw.push(s.date);
+
+    const dates = raw.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    if (dates.length === 0) return 'Non définie';
+    const fmt = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('fr-FR');
+    const first = dates[0];
+    const last = dates[dates.length - 1];
+    return first === last ? `Le ${fmt(first)}` : `Du ${fmt(first)} au ${fmt(last)}`;
+  })();
+
+  const reportDate = new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' });
+
   // Génère un PDF formaté (en-tête + logo). jsPDF est chargé à la demande,
   // et le logo ne bloque jamais la production du rapport.
   const generateFormattedPDF = (reportType: 'course' | 'supervision'): Promise<Blob> =>
@@ -244,9 +271,12 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
                 ? 'MOOC'
                 : 'Matière Classique',
         },
-        { label: 'Date du rapport', value: new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' }) },
+        { label: 'Enseignant', value: teacherName },
+        { label: 'Période couverte', value: reportPeriod },
+        { label: 'Date du rapport', value: reportDate },
       ],
       content: buildReportContent(reportType),
+      signature: { name: teacherName, date: reportDate },
     });
 
   const getReportFileName = (reportType: string) => `Rapport_${reportType === 'course' ? 'Cours' : 'Encadrement'}_${moduleName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;

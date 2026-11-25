@@ -24,6 +24,8 @@ export interface PedagogicalReportPdfOptions {
   content: string;
   /** Logo (data URL PNG/JPEG/WebP/SVG, ou URL) — facultatif. */
   logo?: string | null;
+  /** Bloc de visa (enseignant + date) en fin de rapport — facultatif. */
+  signature?: { name: string; date: string };
 }
 
 const PAGE_MARGIN = 14;
@@ -256,6 +258,9 @@ export async function generatePedagogicalReportPDF(
     }
   };
 
+  // ─── Sommaire numéroté des sections ───
+  let sectionIndex = 0;
+
   const lines = options.content.split('\n');
   for (const rawLine of lines) {
     const line = sanitizeForPdf(rawLine);
@@ -267,7 +272,8 @@ export async function generatePedagogicalReportPDF(
 
     const section = SECTION_RE.exec(line);
     if (section) {
-      const heading = section[1].toUpperCase();
+      sectionIndex += 1;
+      const heading = `${sectionIndex}. ${section[1].toUpperCase()}`;
       ensureSpace(12);
       doc.setFillColor(238, 240, 244);
       doc.rect(PAGE_MARGIN, y - 4.2, contentWidth, 7, 'F');
@@ -295,6 +301,35 @@ export async function generatePedagogicalReportPDF(
       doc.text(part, PAGE_MARGIN + indent, y);
       y += LINE_HEIGHT;
     }
+  }
+
+  // ─── Visa de l'enseignant ───
+  if (options.signature) {
+    const boxHeight = 28;
+    ensureSpace(boxHeight + 8);
+    y += 6;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.rect(PAGE_MARGIN, y, contentWidth, boxHeight);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(30, 58, 138);
+    doc.text("VISA DE L'ENSEIGNANT", PAGE_MARGIN + 4, y + 6);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(60, 60, 60);
+    doc.text(sanitizeForPdf(options.signature.name), PAGE_MARGIN + 4, y + 12);
+    doc.text(`Fait le ${sanitizeForPdf(options.signature.date)}`, pageWidth - PAGE_MARGIN - 4, y + 12, { align: 'right' });
+
+    doc.setDrawColor(120, 120, 120);
+    doc.line(PAGE_MARGIN + 4, y + 22, PAGE_MARGIN + 64, y + 22);
+    doc.setFontSize(7.5);
+    doc.setTextColor(120, 120, 120);
+    doc.text('Signature et cachet', PAGE_MARGIN + 4, y + 26);
+
+    y += boxHeight + 4;
   }
 
   drawFooter();
