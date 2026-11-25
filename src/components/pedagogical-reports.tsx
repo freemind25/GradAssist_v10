@@ -405,7 +405,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
                 <BarChart3 className="h-5 w-5 text-primary" />Avancement du Programme — {moduleName}
               </CardTitle>
               <CardDescription>
-                Suivi de l'avancement des cours, TD et atelier par rapport au programme du canevas.
+                Suivi de l&apos;avancement des cours, TD et atelier par rapport au programme du canevas.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -413,7 +413,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
                 <div className="text-center py-8 text-muted-foreground">
                   <BookOpen className="h-10 w-10 mx-auto mb-2 opacity-40" />
                   <p className="text-sm">Aucun chapitre défini dans le canevas.</p>
-                  <p className="text-xs mt-1">Ajoutez des chapitres dans l'onglet Canevas pour suivre l'avancement.</p>
+                  <p className="text-xs mt-1">Ajoutez des chapitres dans l&apos;onglet Canevas pour suivre l&apos;avancement.</p>
                 </div>
               ) : (
                 <>
@@ -520,7 +520,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
             <div className="h-1 bg-gradient-to-r from-purple-500 via-primary to-purple-500" />
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-purple-600" />Suivi de l'Encadrement
+                <BookOpen className="h-5 w-5 text-purple-600" />Suivi de l&apos;Encadrement
               </CardTitle>
               <CardDescription>
                 État des mémoires et thèses sous votre supervision.
@@ -531,7 +531,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
                 <div className="text-center py-8 text-muted-foreground">
                   <GraduationCap className="h-10 w-10 mx-auto mb-2 opacity-40" />
                   <p className="text-sm">Aucun étudiant encadré enregistré.</p>
-                  <p className="text-xs mt-1">Ajoutez des étudiants dans l'onglet Encadrement.</p>
+                  <p className="text-xs mt-1">Ajoutez des étudiants dans l&apos;onglet Encadrement.</p>
                 </div>
               ) : (
                 <>
@@ -612,7 +612,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
                 <div className="text-center py-8 text-muted-foreground">
                   <Timer className="h-10 w-10 mx-auto mb-2 opacity-40" />
                   <p className="text-sm">Aucune séance de tutorat enregistrée.</p>
-                  <p className="text-xs mt-1">Ajoutez des séances dans l'onglet Tutorat.</p>
+                  <p className="text-xs mt-1">Ajoutez des séances dans l&apos;onglet Tutorat.</p>
                 </div>
               ) : (
                 <>
