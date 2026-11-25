@@ -66,7 +66,9 @@ function buildCspHeader(nonce: string): string {
   const csp = [
     `default-src 'self'`,
     // Google Identity Services (gsi/client) + 'unsafe-eval' requis par Google OAuth popup
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://accounts.google.com`,
+    // 'unsafe-eval' n'est requis qu'en développement : webpack compile les
+    // modules avec eval() (source maps), sinon l'application ne s'hydrate pas.
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''} https://accounts.google.com`,
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     `font-src 'self' https://fonts.gstatic.com data:`,
     `img-src 'self' data: blob: https:`,  // logos universités peuvent être https

@@ -10,6 +10,10 @@ import type { NextConfig } from 'next';
 // Static export temporaire pour les builds Electron/Capacitor (NEXT_STATIC_EXPORT=1).
 // Par défaut : 'standalone' pour Vercel (serverful, API routes /api/* actives).
 const isStaticExport = process.env.NEXT_STATIC_EXPORT === '1';
+// En développement, webpack compile les modules avec `eval()` (source maps).
+// Sans 'unsafe-eval', le navigateur refuse ces scripts et l'application reste
+// bloquée sur « Chargement de l'application... ». Jamais en production.
+const isDev = process.env.NODE_ENV === 'development';
 
 const nextConfig: NextConfig = {
   output: isStaticExport ? 'export' : 'standalone',
@@ -54,7 +58,7 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' https://accounts.google.com",
+              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://accounts.google.com`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com data:",
               "img-src 'self' data: blob: https:",

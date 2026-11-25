@@ -2,13 +2,15 @@
 
 import { useState, useMemo } from 'react';
 import { uploadToDrive, isDriveConnected } from '@/lib/google-drive-service';
-import { saveDocument } from '@/lib/export-guard';
+import { saveDocument, shareDocument } from '@/lib/export-guard';
+import { generatePedagogicalReportPDF } from '@/lib/pedagogical-report-pdf';
+import { toast } from '@/hooks/use-toast';
 import type { EvaluationData, ModuleType, SyllabusChapter, TutoringSession, TutoringSessionType, ThesisStudent } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   BookOpen, Calendar, Clock, FileText, GraduationCap, Users,
-  Download, CheckCircle2, AlertTriangle, BarChart3, TrendingUp,
+  Download, CheckCircle2, AlertTriangle, BarChart3, Share, TrendingUp,
   Circle, Timer, Star, Target, Cloud
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -163,7 +165,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
       if (moduleType === 'atelier') {
         content += `\n--- ÉVALUATION ---\n\n`;
         content += `Note totale : ${evaluationData.totalPoints}\n`;
-        content += `Nombre de critères : ${evaluationData.criteria.length}\n`;
+        content += `Nombre de critères : ${evaluationData.criteria?.length ?? 0}\n`;
       } else {
         content += `\n--- ÉVALUATION ---\n\n`;
         content += `Note CC : ${evaluationData.continuousAssessmentGrade ?? 'N/A'}/20\n`;
@@ -188,7 +190,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
         for (const s of thesisStudents) {
           content += `  ${s.firstName} ${s.lastName} — ${s.status} (${s.progress}%) — ${s.title || 'Sans titre'}\n`;
           content += `    Directeur: ${s.advisor || 'N/A'} | Co-encadrant: ${s.coAdvisor || 'N/A'}\n`;
-          if (s.events.length > 0) content += `    Événements : ${s.events.length}\n`;
+          if ((s.events?.length ?? 0) > 0) content += `    Événements : ${s.events?.length ?? 0}\n`;
         }
       } else {
         content += `Aucun étudiant encadré enregistré.\n`;
@@ -219,18 +221,46 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
     return content;
   };
 
-  const getReportFileName = (reportType: string) => `Rapport_${reportType === 'course' ? 'Cours' : 'Encadrement'}_${moduleName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.txt`;
+  // Génère un PDF formaté (en-tête + logo). jsPDF est chargé à la demande,
+  // et le logo ne bloque jamais la production du rapport.
+  const generateFormattedPDF = (reportType: 'course' | 'supervision'): Promise<Blob> =>
+    generatePedagogicalReportPDF({
+      title:
+        reportType === 'course'
+          ? 'RAPPORT DE SUIVI PÉDAGOGIQUE'
+          : "RAPPORT D'ENCADREMENT ET TUTORAT",
+      logo: evaluationData.universityLogo,
+      info: [
+        { label: 'Université', value: evaluationData.universityName || 'Non définie' },
+        { label: 'Département', value: evaluationData.departmentName || 'Non définie' },
+        { label: 'Année académique', value: evaluationData.academicYear || 'Non définie' },
+        { label: 'Module', value: moduleName || 'Non défini' },
+        {
+          label: 'Type',
+          value:
+            moduleType === 'atelier'
+              ? 'Atelier'
+              : moduleType === 'mooc'
+                ? 'MOOC'
+                : 'Matière Classique',
+        },
+        { label: 'Date du rapport', value: new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' }) },
+      ],
+      content: buildReportContent(reportType),
+    });
 
-  const handleSaveToDrive = async (reportType: string) => {
+  const getReportFileName = (reportType: string) => `Rapport_${reportType === 'course' ? 'Cours' : 'Encadrement'}_${moduleName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+
+  const handleSaveToDrive = async (reportType: 'course' | 'supervision') => {
     if (!isDriveConnected()) {
       alert('Veuillez d\'abord connecter votre Google Drive depuis le bouton "Drive" dans le header.');
       return;
     }
     setDriveSaving(true);
     try {
-      const content = buildReportContent(reportType);
+      const pdfBlob = await generateFormattedPDF(reportType);
       const fileName = getReportFileName(reportType);
-      await uploadToDrive(fileName, content, 'text/plain');
+      await uploadToDrive(fileName, pdfBlob, 'application/pdf');
       alert('✅ Rapport sauvegardé dans Google Drive !\n\nFichier : ' + fileName + '\nDossier : GradeAssist/');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erreur inconnue';
@@ -240,16 +270,48 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
     }
   };
 
-  const handleExportReport = async (reportType: string) => {
-    const content = buildReportContent(reportType);
-    const defaultFileName = getReportFileName(reportType);
+  const handleExportReport = async (reportType: 'course' | 'supervision') => {
+    try {
+      const pdfBlob = await generateFormattedPDF(reportType);
 
-    // Sur la WebView Android, cette manœuvre est ignorée sans erreur :
-    // `saveDocument` écrit alors sur l'appareil via le plugin Filesystem.
-    await saveDocument(
-      defaultFileName,
-      new Blob([content], { type: 'text/plain;charset=utf-8' })
-    );
+      // Sur la WebView Android, le téléchargement par `<a download>` est ignoré
+      // sans erreur : `saveDocument` écrit alors le fichier via Filesystem.
+      await saveDocument(getReportFileName(reportType), pdfBlob);
+    } catch (error) {
+      console.error('Échec de la génération du PDF :', error);
+      toast({
+        variant: 'destructive',
+        title: 'PDF non généré',
+        description:
+          error instanceof Error
+            ? error.message
+            : "Erreur inconnue lors de la création du rapport.",
+      });
+    }
+  };
+
+  const handleShareReport = async (reportType: 'course' | 'supervision') => {
+    try {
+      const pdfBlob = await generateFormattedPDF(reportType);
+
+      await shareDocument(getReportFileName(reportType), pdfBlob, {
+        title:
+          reportType === 'course'
+            ? `Rapport Cours - ${moduleName}`
+            : `Rapport Encadrement - ${moduleName}`,
+        text: 'Rapport pédagogique généré',
+      });
+    } catch (error) {
+      console.error('Échec du partage du rapport :', error);
+      toast({
+        variant: 'destructive',
+        title: 'Partage impossible',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Le PDF du rapport n\'a pas pu être préparé.',
+      });
+    }
   };
 
   return (
@@ -263,10 +325,8 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
             activeReport === 'course'
               ? "bg-primary text-primary-foreground shadow-md"
               : "bg-muted hover:bg-muted/80 text-muted-foreground"
-          )}
-        >
-          <BookOpen className="h-4 w-4" />
-          Suivi Cours / Canevas
+          )}>
+          <BookOpen className="h-4 w-4" />Suivi Cours / Canevas
         </button>
         <button
           onClick={() => setActiveReport('supervision')}
@@ -275,10 +335,8 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
             activeReport === 'supervision'
               ? "bg-primary text-primary-foreground shadow-md"
               : "bg-muted hover:bg-muted/80 text-muted-foreground"
-          )}
-        >
-          <GraduationCap className="h-4 w-4" />
-          Encadrement & Tutorat
+          )}>
+          <GraduationCap className="h-4 w-4" />Encadrement & Tutorat
         </button>
       </div>
 
@@ -328,14 +386,12 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
             </Card>
             <Card className="card-premium">
               <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center", progress.overdue > 0 ? "bg-red-100" : "bg-muted")}>
-                    <AlertTriangle className={cn("h-5 w-5", progress.overdue > 0 ? "text-red-600" : "text-muted-foreground")} />
-                  </div>
-                  <div>
-                    <p className={cn("text-2xl font-extrabold", progress.overdue > 0 ? "text-red-600" : "")}>{progress.overdue}</p>
-                    <p className="text-xs text-muted-foreground">En retard</p>
-                  </div>
+                <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center", progress.overdue > 0 ? "bg-red-100" : "bg-muted")}>
+                  <AlertTriangle className={cn("h-5 w-5", progress.overdue > 0 ? "text-red-600" : "text-muted-foreground")} />
+                </div>
+                <div>
+                  <p className={cn("text-2xl font-extrabold", progress.overdue > 0 ? "text-red-600" : "")}>{progress.overdue}</p>
+                  <p className="text-xs text-muted-foreground">En retard</p>
                 </div>
               </CardContent>
             </Card>
@@ -346,11 +402,10 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
             <div className="h-1 bg-gradient-to-r from-primary/60 via-accent to-primary/60" />
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                Avancement du Programme — {moduleName}
+                <BarChart3 className="h-5 w-5 text-primary" />Avancement du Programme — {moduleName}
               </CardTitle>
               <CardDescription>
-                Suivi de l&apos;avancement des cours, TD et atelier par rapport au programme du canevas.
+                Suivi de l'avancement des cours, TD et atelier par rapport au programme du canevas.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -358,7 +413,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
                 <div className="text-center py-8 text-muted-foreground">
                   <BookOpen className="h-10 w-10 mx-auto mb-2 opacity-40" />
                   <p className="text-sm">Aucun chapitre défini dans le canevas.</p>
-                  <p className="text-xs mt-1">Ajoutez des chapitres dans l&apos;onglet Canevas pour suivre l&apos;avancement.</p>
+                  <p className="text-xs mt-1">Ajoutez des chapitres dans l'onglet Canevas pour suivre l'avancement.</p>
                 </div>
               ) : (
                 <>
@@ -393,13 +448,9 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
                       const isOverdue = ch.plannedEndDate && ch.status !== 'completed' && ch.plannedEndDate < new Date().toISOString().slice(0, 10);
                       return (
                         <div key={ch.id} className={cn("grid grid-cols-[1fr_120px_120px_100px] gap-2 px-3 py-2 border-t text-sm items-center", isOverdue && "bg-red-50/50")}>
-                          <span className={cn("font-medium", ch.status === 'completed' && "line-through opacity-60")}>
-                            {ch.title}
-                          </span>
+                          <span className={cn("font-medium", ch.status === 'completed' && "line-through opacity-60")}>{ch.title}</span>
                           <span className="text-xs">{ch.plannedDate || '—'}</span>
-                          <span className={cn("text-xs", isOverdue && "text-destructive font-medium")}>
-                            {ch.plannedEndDate || '—'}{isOverdue && ' ⚠️'}
-                          </span>
+                          <span className={cn("text-xs", isOverdue && "text-destructive font-medium")}>{ch.plannedEndDate || '—'}{isOverdue && ' ⚠️'}</span>
                           <span className={cn("text-xs font-medium",
                             ch.status === 'completed' ? "text-emerald-600" :
                             ch.status === 'in_progress' ? "text-blue-600" : "text-muted-foreground"
@@ -417,8 +468,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
               {attendanceStats && (
                 <div className="mt-6 pt-4 border-t">
                   <h4 className="text-sm font-bold mb-3 flex items-center gap-2">
-                    <Users className="h-4 w-4 text-primary" />
-                    Synthèse des Présences
+                    <Users className="h-4 w-4 text-primary" />Synthèse des Présences
                   </h4>
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     <div className="text-center p-3 bg-muted/30 rounded-lg">
@@ -450,12 +500,13 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
           {/* Export Buttons */}
           <div className="flex justify-end gap-2">
             <Button onClick={() => handleExportReport('course')} variant="outline">
-              <Download className="mr-2 h-4 w-4" />
-              Télécharger le rapport
+              <Download className="mr-2 h-4 w-4" />Télécharger le rapport
+            </Button>
+            <Button onClick={() => handleShareReport('course')} variant="default" className="gap-2">
+              <Share className="mr-2 h-4 w-4" />Partager
             </Button>
             <Button onClick={() => handleSaveToDrive('course')} variant="default" disabled={driveSaving} className="gap-2">
-              <Cloud className="h-4 w-4" />
-              {driveSaving ? 'Sauvegarde...' : 'Sauvegarder sur Google Drive'}
+              <Cloud className="h-4 w-4" />{driveSaving ? 'Sauvegarde...' : 'Sauvegarder sur Google Drive'}
             </Button>
           </div>
         </div>
@@ -469,8 +520,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
             <div className="h-1 bg-gradient-to-r from-purple-500 via-primary to-purple-500" />
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-purple-600" />
-                Suivi de l&apos;Encadrement
+                <BookOpen className="h-5 w-5 text-purple-600" />Suivi de l'Encadrement
               </CardTitle>
               <CardDescription>
                 État des mémoires et thèses sous votre supervision.
@@ -481,7 +531,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
                 <div className="text-center py-8 text-muted-foreground">
                   <GraduationCap className="h-10 w-10 mx-auto mb-2 opacity-40" />
                   <p className="text-sm">Aucun étudiant encadré enregistré.</p>
-                  <p className="text-xs mt-1">Ajoutez des étudiants dans l&apos;onglet Encadrement.</p>
+                  <p className="text-xs mt-1">Ajoutez des étudiants dans l'onglet Encadrement.</p>
                 </div>
               ) : (
                 <>
@@ -551,8 +601,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
             <div className="h-1 bg-gradient-to-r from-amber-500 via-primary to-amber-500" />
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <GraduationCap className="h-5 w-5 text-amber-600" />
-                Suivi du Tutorat
+                <GraduationCap className="h-5 w-5 text-amber-600" />Suivi du Tutorat
               </CardTitle>
               <CardDescription>
                 Statistiques et détails des séances de tutorat.
@@ -563,7 +612,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
                 <div className="text-center py-8 text-muted-foreground">
                   <Timer className="h-10 w-10 mx-auto mb-2 opacity-40" />
                   <p className="text-sm">Aucune séance de tutorat enregistrée.</p>
-                  <p className="text-xs mt-1">Ajoutez des séances dans l&apos;onglet Tutorat.</p>
+                  <p className="text-xs mt-1">Ajoutez des séances dans l'onglet Tutorat.</p>
                 </div>
               ) : (
                 <>
@@ -593,8 +642,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
                   {/* By type breakdown */}
                   <div className="border rounded-lg p-4">
                     <h4 className="text-sm font-bold mb-3 flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-primary" />
-                      Répartition par type de séance
+                      <TrendingUp className="h-4 w-4 text-primary" />Répartition par type de séance
                     </h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                       {Object.entries(tutoringStats.byType).map(([type, count]) => (
@@ -610,8 +658,7 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
                   {/* By student breakdown */}
                   <div className="border rounded-lg p-4">
                     <h4 className="text-sm font-bold mb-3 flex items-center gap-2">
-                      <Users className="h-4 w-4 text-primary" />
-                      Nombre de séances par étudiant
+                      <Users className="h-4 w-4 text-primary" />Nombre de séances par étudiant
                     </h4>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                       {Object.entries(tutoringStats.byStudent)
@@ -621,15 +668,15 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
                             <span className="text-sm font-medium truncate">{student}</span>
                             <span className="text-sm text-primary font-bold">{count}</span>
                           </div>
-                        ))}
+                        )
+                      )}
                     </div>
                   </div>
 
                   {/* Recent sessions */}
                   <div className="border rounded-lg overflow-hidden">
                     <div className="px-3 py-2 bg-muted/50 text-xs font-medium text-muted-foreground flex items-center gap-2">
-                      <Calendar className="h-3.5 w-3.5" />
-                      Dernières séances
+                      <Calendar className="h-3.5 w-3.5" />Dernières séances
                     </div>
                     {tutoringSessions.slice(-5).reverse().map((s) => (
                       <div key={s.id} className="flex items-center gap-3 px-3 py-2 border-t text-sm">
@@ -660,12 +707,13 @@ export function PedagogicalReports({ evaluationData, moduleName, moduleType }: P
           {/* Export Buttons */}
           <div className="flex justify-end gap-2">
             <Button onClick={() => handleExportReport('supervision')} variant="outline">
-              <Download className="mr-2 h-4 w-4" />
-              Télécharger le rapport
+              <Download className="mr-2 h-4 w-4" />Télécharger le rapport
+            </Button>
+            <Button onClick={() => handleShareReport('supervision')} variant="default" className="gap-2">
+              <Share className="mr-2 h-4 w-4" />Partager
             </Button>
             <Button onClick={() => handleSaveToDrive('supervision')} variant="default" disabled={driveSaving} className="gap-2">
-              <Cloud className="h-4 w-4" />
-              {driveSaving ? 'Sauvegarde...' : 'Sauvegarder sur Google Drive'}
+              <Cloud className="h-4 w-4" />{driveSaving ? 'Sauvegarde...' : 'Sauvegarder sur Google Drive'}
             </Button>
           </div>
         </div>

@@ -251,7 +251,7 @@ async function ensureGradeAssistFolder(token: string): Promise<string> {
  */
 export async function uploadToDrive(
   fileName: string,
-  content: string,
+  content: string | Blob,
   mimeType: string = 'text/plain'
 ): Promise<string> {
   const tokenData = getStoredToken();
@@ -269,7 +269,7 @@ export async function uploadToDrive(
 
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', new Blob([content], { type: mimeType }));
+  form.append('file', content instanceof Blob ? content : new Blob([content], { type: mimeType }));
 
   const res = await fetch(
     `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name`,
