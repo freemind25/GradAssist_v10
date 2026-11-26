@@ -88,17 +88,47 @@ jobs:
       - name: Install Cypress
         run: npx cypress install
 
-      - name: Run smoke tests
-        uses: cypress-io/github-action@v6
-        with:
-          install: false
-          build: npm run build
-          start: npm run start
-          wait-on: 'http://localhost:3000'
-          wait-on-timeout: 180
-          spec: cypress/e2e/00-smoke.cy.ts
+      # Le serveur est démarré et attendu ici plutôt que via l'option
+      # `wait-on` de cypress-io/github-action : sur les runners actuels
+      # (Node 24), son ping interne échoue immédiatement avec
+      # ERR_SOCKET_CLOSED_BEFORE_CONNECTION au lieu d'attendre que le
+      # serveur écoute. Une boucle curl fait la même chose sans ce défaut.
+      - name: Build
+        run: npm run build
+
+      - name: Start server and run smoke tests
+        run: |
+          set -euo pipefail
+          npm run start > /tmp/next-start.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          ready=""
+          for _ in $(seq 1 120); do
+            if curl -sf -o /dev/null http://127.0.0.1:3000/; then
+              ready="yes"
+              break
+            fi
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo "Le serveur s'est arrêté avant d'être prêt."
+              cat /tmp/next-start.log
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ -z "$ready" ]; then
+            echo "Le serveur n'a pas répondu dans les 120 secondes."
+            cat /tmp/next-start.log
+            exit 1
+          fi
+
+          if ! npx cypress run --spec cypress/e2e/00-smoke.cy.ts; then
+            echo "--- Journal du serveur ---"
+            cat /tmp/next-start.log
+            exit 1
+          fi
         env:
-          CYPRESS_BASE_URL: http://localhost:3000
+          CYPRESS_BASE_URL: http://127.0.0.1:3000
 
       - name: Upload screenshots on failure
         if: failure()
