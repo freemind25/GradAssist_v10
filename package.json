@@ -108,7 +108,7 @@
     "firebase": "^11.7.0",
     "genkit": "^1.8.0",
     "jsonwebtoken": "^9.0.2",
-    "jspdf": "^2.5.1",
+    "jspdf": "^4.2.1",
     "jspdf-autotable": "^3.8.2",
     "lucide-react": "^0.475.0",
     "next": "15.2.8",
