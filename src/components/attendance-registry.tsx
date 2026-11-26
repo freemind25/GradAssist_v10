@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { saveDocument, shareDocument } from "@/lib/export-guard";
+import { getLastAutoTableFinalY } from "@/lib/pdf-autotable";
 import { CheckCircle2, XCircle, Clock, FileText, UserCheck, Download, Calendar as CalendarIcon, FileBarChart, Mail, Send } from "lucide-react";
 import type { AttendanceData, AttendanceStatus } from "@/types";
 import { cn } from '@/lib/utils';
@@ -355,7 +356,7 @@ export function AttendanceRegistry({
         });
 
         // ═══ 4. Legend ═══
-        const finalY = (doc as any).lastAutoTable.finalY || yPos + 50;
+        const finalY = getLastAutoTableFinalY(doc, yPos + 50);
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(80, 80, 80);

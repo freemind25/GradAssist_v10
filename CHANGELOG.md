@@ -2,6 +2,25 @@
 
 Toutes les dates sont au format JJ/MM/AAAA.
 
+## Non publié — découpage des gros composants (26/11/2026)
+
+### Dette
+
+- **`app/page.tsx` (956 → 650 lignes)** : le stockage local quitte la page.
+  `lib/module-store.ts` regroupe les clés, la création d'un module vierge, la
+  lecture avec migration de version et l'écriture (qui signale désormais le
+  quota dépassé par un booléen, sans passer par l'état du composant). Les deux
+  dialogues de matière passent dans `components/module-dialogs.tsx`, et
+  `lib/app-version.ts` devient la seule définition de `APP_VERSION`.
+- **`components/syllabus-tracker.tsx` (872 → 466 lignes)** : les helpers purs
+  (arbre des chapitres, progression, filtrage, modèle de départ) passent dans
+  `lib/syllabus.ts`, le stockage IndexedDB et le décodage des data URLs dans
+  `lib/syllabus-pdf-store.ts`, la ligne de chapitre et l'aperçu PDF dans
+  `components/syllabus/`. Le décodage base64, dupliqué à trois endroits, est
+  désormais fait une fois (`decodeDataUrl`).
+- **Accès typé à `lastAutoTable`** : `lib/pdf-autotable.ts` remplace les deux
+  `(doc as any).lastAutoTable.finalY` des exports PDF.
+
 ## Non publié — parcours critique testé en CI et version unique (26/11/2026)
 
 ### Tests

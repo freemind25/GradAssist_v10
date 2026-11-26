@@ -7,6 +7,7 @@ import autoTable from "jspdf-autotable";
 import type { Criterion, SelectedGrades, EvaluationData } from "@/types";
 import { toast } from "@/hooks/use-toast";
 import { saveDocument } from "@/lib/export-guard";
+import { getLastAutoTableFinalY } from "@/lib/pdf-autotable";
 
 const NON_NOTE_VALUE = "__NONE__";
 const BASE_DOCUMENT_TITLE_PREFIX = "Fiche d'évaluation des travaux de l'atelier";
@@ -234,7 +235,7 @@ export const exportIndividualPDF = async (params: ExportIndividualParams): Promi
     didParseCell: (data) => { if (data.column.index === 0 && typeof data.cell.raw === 'string' && data.cell.raw.includes('\\n')) data.cell.styles.valign = 'middle'; }
   });
   
-  const finalY = (doc as any).lastAutoTable.finalY || yPos + 50;
+  const finalY = getLastAutoTableFinalY(doc, yPos + 50);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.text(`Note Finale: ${totalPoints.toFixed(2)} / ${maxTotalPoints.toFixed(2)}`, pageMargin, finalY + 10);

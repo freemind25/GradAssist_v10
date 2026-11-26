@@ -46,10 +46,16 @@ src/
 │   ├── auth/{login,signup}/     # pages orphelines (aucun lien produit)
 │   ├── conditions/, confidentialite/
 ├── components/                  # 12 modules métier + 23 primitives ShadCN (ui/)
+│   ├── module-dialogs.tsx       # création / configuration d'une matière
+│   └── syllabus/                # ligne de chapitre, aperçu PDF en images
 ├── lib/
+│   ├── app-version.ts           # version unique du client (injectée au build)
+│   ├── module-store.ts          # lecture, migration et écriture des modules
 │   ├── export-service.ts        # PDF et CSV (jsPDF)
 │   ├── export-guard.ts          # enregistrement natif / téléchargement web
 │   ├── backup-service.ts        # export/restauration JSON des modules
+│   ├── syllabus.ts              # helpers purs du canevas (arbre, progression)
+│   ├── syllabus-pdf-store.ts    # PDF du canevas dans IndexedDB
 │   ├── platform.ts              # détection WebView / Electron
 │   ├── auth.ts, db.ts           # Neon + bcrypt + JWT
 │   ├── ai-proxy.ts, ai-providers.ts, api-guard.ts, rate-limit.ts
@@ -84,6 +90,7 @@ EvaluationModule {
 ## 4. État et persistance
 
 - **Propriétaire unique** : `page.tsx` détient `modules[]` et `activeModuleId`; tout descend par props.
+- **Persistance isolée** : `lib/module-store.ts` porte les clés `localStorage`, le chargement, la migration de version et l'écriture (retour `false` si quota dépassé) ; `page.tsx` ne garde que l'orchestration.
 - **Écriture différée** de 1 000 ms après la dernière modification, plus une écriture forcée sur `pagehide` / `visibilitychange` (sinon la dernière saisie était perdue à la fermeture).
 - **Quota** : un échec d'écriture déclenche un bandeau explicite ; le pied de page affiche l'espace occupé.
 - **Sauvegarde** : fichier JSON versionné (`backup-service.ts`), restauration avec validation et complétion des champs manquants, au choix « remplacer » ou « ajouter ».

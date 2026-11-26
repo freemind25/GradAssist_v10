@@ -1,13 +1,9 @@
 "use client";
 
-import type * as React from 'react';
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { BookCopy, Plus, FolderPlus, Trash2, Download, Upload, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DEFAULT_CRITERIA, TARGET_SUM_COEFFICIENTS } from "@/config/grading-config";
 import type { EvaluationData, EvaluationModule as EvaluationModuleType, ModuleType } from "@/types";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { EvaluationModule } from '@/components/evaluation-module';
 import { HelpGuideDialog } from '@/components/help-guide-dialog';
@@ -15,6 +11,7 @@ import { TeacherLogin, getTeacher, type TeacherProfile } from '@/components/teac
 import { GoogleDriveSync } from '@/components/google-drive-sync';
 import { PwaInstallBanner } from '@/components/pwa-install';
 import { BackupReminder } from '@/components/backup-reminder';
+import { ConfigureModuleDialog, NewModuleDialog } from '@/components/module-dialogs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   downloadBackup,
@@ -29,6 +26,13 @@ import {
   type ParsedBackup,
   type SafetySnapshotInfo,
 } from '@/lib/backup-service';
+import { APP_VERSION } from '@/lib/app-version';
+import {
+  createDefaultModules,
+  getNewEvaluationModule,
+  loadStoredState,
+  persistState,
+} from '@/lib/module-store';
 
 import {
   Menubar,
@@ -38,15 +42,6 @@ import {
   MenubarSeparator,
   MenubarTrigger,
 } from "@/components/ui/menubar";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,253 +53,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-
-const LOCALSTORAGE_MODULES_KEY = 'gradeAssist_modules';
-const LOCALSTORAGE_ACTIVE_MODULE_ID_KEY = 'gradeAssist_activeModuleId';
-const LOCALSTORAGE_VERSION_KEY = 'gradeAssist_version';
-// Injectée au build depuis package.json (voir next.config.ts) : une seule
-// version pour l'application, l'export et les rapports.
-const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? 'dev';
-
-// Default module names from older versions that should be replaced
-const OLD_DEFAULT_MODULE_NAMES = [
-  'Atelier Projet de Ville 1',
-  'Projet de Ville 1',
-  'Atelier Projet de Ville 2',
-  'Projet de Ville 2',
-  'Urbanisme',
-  'Cours',
-  'Cours et TD',
-  'Atelier',
-];
-
-const getNewEvaluationModule = (type: ModuleType, name: string): EvaluationModuleType => {
-  const baseModule = {
-    id: `module_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-    name: name,
-    type: type,
-    evaluationData: {
-      id: `eval_${Date.now()}`,
-      studentNames: [],
-      teacherNames: [""],
-      projectName: "",
-      studyLevel: "",
-      studySubLevel: "",
-      session: "",
-      academicYear: "",
-      universityName: "",
-      establishmentName: "",
-      departmentName: "",
-      masterSpecialty: "",
-      universityLogo: null,
-      selectedGrades: {},
-      totalPoints: 0,
-      evaluationSheetTitleComplement: "...............................................................",
-      criteria: type === 'atelier' ? DEFAULT_CRITERIA : [],
-      attendance: {},
-      thesisStudents: [],
-      adminEmail: "",
-      syllabus: { chapters: [], pdfFileName: null, pdfDataUrl: null },
-      quickNotes: [],
-      workGroups: [],
-      tutoringSessions: [],
-      studentResults: [],
-      atRiskConfig: { attendanceThreshold: 75, gradeThreshold: 10 },
-      continuousAssessmentGrade: (type === 'standard' || type === 'mooc') ? 10 : undefined,
-      examGrade: (type === 'standard' || type === 'mooc') ? 10 : undefined,
-      continuousAssessmentWeight: (type === 'standard' || type === 'mooc') ? 40 : undefined,
-    },
-  };
-
-  return baseModule;
-};
-
-
-function NewModuleDialog({ onCreate, trigger }: { onCreate: (name: string, type: ModuleType) => void, trigger?: React.ReactNode }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [type, setType] = useState<ModuleType>("atelier");
-  const { toast } = useToast();
-
-  const handleCreate = () => {
-    if (!name.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Nom manquant",
-        description: "Veuillez donner un nom à la nouvelle matière.",
-      });
-      return;
-    }
-    onCreate(name, type);
-    setName("");
-    setType("atelier");
-    setIsOpen(false);
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <MenubarItem onSelect={(e) => e.preventDefault()}>
-            <FolderPlus className="mr-2 h-4 w-4" />
-            Nouveau Module...
-          </MenubarItem>
-        )}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Créer une nouvelle matière</DialogTitle>
-          <DialogDescription>
-            Choisissez un nom et un type d&apos;évaluation pour votre nouvelle matière ou atelier.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="module-name" className="text-right">
-              Nom
-            </Label>
-            <Input
-              id="module-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="col-span-3"
-              placeholder="Ex: Nom de la matière ou de l'atelier"
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="module-type" className="text-right">
-              Type
-            </Label>
-            <RadioGroup
-              defaultValue="atelier"
-              className="col-span-3 flex flex-col gap-2"
-              onValueChange={(value: ModuleType) => setType(value)}
-              value={type}
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="atelier" id="r-atelier" />
-                <Label htmlFor="r-atelier" className='font-normal'>Atelier (Évaluation par critères)</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="standard" id="r-standard" />
-                <Label htmlFor="r-standard" className='font-normal'>Matière Classique (CC + Examen)</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="mooc" id="r-mooc" />
-                <Label htmlFor="r-mooc" className='font-normal'>Cours en ligne MOOC (CC + Examen)</Label>
-              </div>
-            </RadioGroup>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button onClick={handleCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            Créer
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// Dialog for configuring an existing blank module (rename + choose type)
-function ConfigureModuleDialog({ module, onConfigure, onDismiss }: { 
-  module: EvaluationModuleType;
-  onConfigure: (moduleId: string, name: string, type: ModuleType) => void;
-  onDismiss: () => void;
-}) {
-  const [isOpen, setIsOpen] = useState(true);
-  const [name, setName] = useState(module.name === "Nouvelle matière" ? "" : module.name);
-  const [type, setType] = useState<ModuleType>(module.type);
-  const { toast } = useToast();
-
-  const handleConfigure = () => {
-    if (!name.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Nom manquant",
-        description: "Veuillez donner un nom à la matière.",
-      });
-      return;
-    }
-    onConfigure(module.id, name, type);
-    setIsOpen(false);
-  };
-
-  const handleDismiss = () => {
-    setIsOpen(false);
-    onDismiss();
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleDismiss(); }}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Configurer la matière</DialogTitle>
-          <DialogDescription>
-            Donnez un nom et choisissez le type d&apos;évaluation.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="config-name" className="text-right">
-              Nom
-            </Label>
-            <Input
-              id="config-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="col-span-3"
-              placeholder="Ex: Mathématiques, Physique..."
-              autoFocus
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label className="text-right">
-              Type
-            </Label>
-            <RadioGroup
-              className="col-span-3 flex flex-col gap-2"
-              onValueChange={(value: ModuleType) => setType(value)}
-              value={type}
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="atelier" id="c-atelier" />
-                <Label htmlFor="c-atelier" className='font-normal'>Atelier (Évaluation par critères)</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="standard" id="c-standard" />
-                <Label htmlFor="c-standard" className='font-normal'>Matière Classique (CC + Examen)</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="mooc" id="c-mooc" />
-                <Label htmlFor="c-mooc" className='font-normal'>Cours en ligne MOOC (CC + Examen)</Label>
-              </div>
-            </RadioGroup>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={handleDismiss}>Annuler</Button>
-          <Button onClick={handleConfigure}>
-            <Plus className="mr-2 h-4 w-4" />
-            Configurer
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 
 export default function GradeAssistPage() {
@@ -333,51 +81,9 @@ export default function GradeAssistPage() {
 
   useEffect(() => {
     try {
-      const modulesData = localStorage.getItem(LOCALSTORAGE_MODULES_KEY);
-      const activeIdData = localStorage.getItem(LOCALSTORAGE_ACTIVE_MODULE_ID_KEY);
-      
-      let loadedModules: EvaluationModuleType[] = [];
-      if (modulesData) {
-        loadedModules = JSON.parse(modulesData);
-      }
-      
-      // Migration: check version and replace old default modules
-      const storedVersion = localStorage.getItem(LOCALSTORAGE_VERSION_KEY);
-      if (storedVersion !== APP_VERSION && Array.isArray(loadedModules) && loadedModules.length > 0) {
-        // La migration remplace des modules : on conserve une copie de l'état
-        // d'avant, restaurable depuis le bandeau de sauvegarde.
-        const willMigrate = loadedModules.some((m) =>
-          OLD_DEFAULT_MODULE_NAMES.includes(m.name)
-        );
-        if (willMigrate) {
-          saveSafetySnapshot(loadedModules, "avant migration de version", APP_VERSION);
-        }
-        loadedModules = loadedModules.map((m) => {
-          if (OLD_DEFAULT_MODULE_NAMES.includes(m.name)) {
-            return getNewEvaluationModule('atelier', 'Nouvelle matière');
-          }
-          return m;
-        });
-        localStorage.setItem(LOCALSTORAGE_VERSION_KEY, APP_VERSION);
-      }
-
-      if (!Array.isArray(loadedModules) || loadedModules.length === 0) {
-        loadedModules = [
-          getNewEvaluationModule('atelier', 'Nouvelle matière'),
-          getNewEvaluationModule('standard', 'Nouvelle matière'),
-          getNewEvaluationModule('mooc', 'Nouvelle matière'),
-        ];
-        localStorage.setItem(LOCALSTORAGE_VERSION_KEY, APP_VERSION);
-      }
-      
-      setModules(loadedModules);
-
-      let activeId = activeIdData ? JSON.parse(activeIdData) : null;
-      if (!activeId || !loadedModules.some(m => m.id === activeId)) {
-        activeId = loadedModules[0]?.id || null;
-      }
-      setActiveModuleId(activeId);
-
+      const stored = loadStoredState(APP_VERSION);
+      setModules(stored.modules);
+      setActiveModuleId(stored.activeModuleId);
     } catch (error) {
       console.error("Failed to load data from localStorage.", error);
       toast({
@@ -385,11 +91,9 @@ export default function GradeAssistPage() {
         title: "Erreur de chargement",
         description: "Impossible de charger les données locales. L'application a été réinitialisée.",
       });
-      const m1 = getNewEvaluationModule('atelier', 'Nouvelle matière');
-      const m2 = getNewEvaluationModule('standard', 'Nouvelle matière');
-      const m3 = getNewEvaluationModule('mooc', 'Nouvelle matière');
-      setModules([m1, m2, m3]);
-      setActiveModuleId(m1.id);
+      const fresh = createDefaultModules();
+      setModules(fresh);
+      setActiveModuleId(fresh[0]?.id ?? null);
     } finally {
       setIsLoaded(true);
     }
@@ -400,19 +104,9 @@ export default function GradeAssistPage() {
   // pied de page affirmait « Données sauvegardées localement ».
   const persist = useCallback(
     (mods: EvaluationModuleType[], activeId: string | null): boolean => {
-      try {
-        localStorage.setItem(LOCALSTORAGE_MODULES_KEY, JSON.stringify(mods));
-        localStorage.setItem(
-          LOCALSTORAGE_ACTIVE_MODULE_ID_KEY,
-          JSON.stringify(activeId)
-        );
-        setStorageFull(false);
-        return true;
-      } catch (error) {
-        console.error("Échec de la sauvegarde locale :", error);
-        setStorageFull(true);
-        return false;
-      }
+      const ok = persistState(mods, activeId);
+      setStorageFull(!ok);
+      return ok;
     },
     []
   );
@@ -477,7 +171,7 @@ export default function GradeAssistPage() {
   // Check if the active module is a blank/unconfigured module
   const isModuleBlank = useMemo(() => {
     if (!activeModule) return false;
-    return activeModule.name === 'Nouvelle matière' && 
+    return activeModule.name === 'Nouvelle matière' &&
            !activeModule.evaluationData.universityName &&
            activeModule.evaluationData.studentNames.length === 0;
   }, [activeModule]);
@@ -520,7 +214,7 @@ export default function GradeAssistPage() {
       return prevModules.map(module => {
         if (module.id === moduleId) {
           const updatedData = { ...module.evaluationData, ...update };
-          
+
           if (module.type === 'atelier' && (update.criteria || update.selectedGrades)) {
             const newTotalPoints = updatedData.criteria.reduce((sum, criterion) => {
               const numericGradeStr = updatedData.selectedGrades[criterion.id];
@@ -555,7 +249,7 @@ export default function GradeAssistPage() {
       description: `La matière "${name}" a été ajoutée.`,
     });
   }, [activeModule, toast]);
-  
+
   const handleDeleteModule = useCallback((moduleId: string) => {
     if (modules.length <= 1) {
        toast({ variant: 'destructive', title: "Action impossible", description: "Vous ne pouvez pas supprimer le dernier module." });
@@ -727,7 +421,7 @@ export default function GradeAssistPage() {
           {/* Decorative circles */}
           <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-accent/10 blur-3xl" />
           <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-white/5 blur-2xl" />
-          
+
           <div className="relative container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-5 gap-4">
               <div className="flex items-center gap-4">
@@ -936,7 +630,7 @@ export default function GradeAssistPage() {
                     persist(modules, activeModuleId);
                 }}
             />
-          
+
             <PwaInstallBanner />
 
             <footer className="text-center text-sm text-muted-foreground py-8 border-t">
