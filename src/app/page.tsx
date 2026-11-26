@@ -14,13 +14,20 @@ import { HelpGuideDialog } from '@/components/help-guide-dialog';
 import { TeacherLogin, getTeacher, type TeacherProfile } from '@/components/teacher-login';
 import { GoogleDriveSync } from '@/components/google-drive-sync';
 import { PwaInstallBanner } from '@/components/pwa-install';
+import { BackupReminder } from '@/components/backup-reminder';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   downloadBackup,
   parseBackup,
   estimateStorageBytes,
   formatBytes,
+  getBackupStatus,
+  recordBackupExport,
+  saveSafetySnapshot,
+  readSafetySnapshot,
+  type BackupStatus,
   type ParsedBackup,
+  type SafetySnapshotInfo,
 } from '@/lib/backup-service';
 
 import {
@@ -312,6 +319,12 @@ export default function GradeAssistPage() {
   const [pendingImport, setPendingImport] = useState<
     (ParsedBackup & { fileName: string }) | null
   >(null);
+  // Suivi de la sauvegarde : dernière date d'export et copie de sécurité
+  // automatique disponible sur l'appareil.
+  const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
+  const [safetySnapshot, setSafetySnapshot] =
+    useState<SafetySnapshotInfo | null>(null);
+  const [reminderHidden, setReminderHidden] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
@@ -329,6 +342,14 @@ export default function GradeAssistPage() {
       // Migration: check version and replace old default modules
       const storedVersion = localStorage.getItem(LOCALSTORAGE_VERSION_KEY);
       if (storedVersion !== APP_VERSION && Array.isArray(loadedModules) && loadedModules.length > 0) {
+        // La migration remplace des modules : on conserve une copie de l'état
+        // d'avant, restaurable depuis le bandeau de sauvegarde.
+        const willMigrate = loadedModules.some((m) =>
+          OLD_DEFAULT_MODULE_NAMES.includes(m.name)
+        );
+        if (willMigrate) {
+          saveSafetySnapshot(loadedModules, "avant migration de version", APP_VERSION);
+        }
         loadedModules = loadedModules.map((m) => {
           if (OLD_DEFAULT_MODULE_NAMES.includes(m.name)) {
             return getNewEvaluationModule('atelier', 'Nouvelle matière');
@@ -423,6 +444,24 @@ export default function GradeAssistPage() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [modules, activeModuleId, isLoaded, persist]);
+
+  // Date du dernier export et ancienneté de la sauvegarde : recalculées à
+  // chaque modification, pour que le rappel reste juste.
+  useEffect(() => {
+    if (!isLoaded) return;
+    setBackupStatus(getBackupStatus(modules));
+  }, [modules, isLoaded]);
+
+  // Copie de sécurité présente sur l'appareil (avant import ou migration).
+  useEffect(() => {
+    const snapshot = readSafetySnapshot();
+    if (!snapshot) return;
+    setSafetySnapshot({
+      savedAt: snapshot.savedAt,
+      reason: snapshot.reason,
+      moduleCount: snapshot.moduleCount,
+    });
+  }, []);
 
   // Check teacher login
   useEffect(() => {
@@ -536,6 +575,13 @@ export default function GradeAssistPage() {
   // produisent un fichier que l'enseignant conserve hors de l'application.
   const storageBytes = useMemo(() => estimateStorageBytes(modules), [modules]);
 
+  // Libellé de la dernière sauvegarde, affiché en pied de page.
+  const lastBackupLabel = !backupStatus?.lastBackupAt
+    ? "aucune"
+    : backupStatus.daysSinceBackup === 0
+      ? "aujourd'hui"
+      : `il y a ${backupStatus.daysSinceBackup} j`;
+
   const handleExportBackup = useCallback(() => {
     if (modules.length === 0) {
       toast({
@@ -547,6 +593,9 @@ export default function GradeAssistPage() {
     }
     try {
       const bytes = downloadBackup(modules, APP_VERSION);
+      // Le fichier est parti : le rappel de sauvegarde repart de zéro.
+      recordBackupExport();
+      setBackupStatus(getBackupStatus(modules));
       toast({
         title: "Sauvegarde téléchargée",
         description: `${modules.length} module(s), ${formatBytes(bytes)}.`,
@@ -584,6 +633,14 @@ export default function GradeAssistPage() {
       if (!pendingImport) return;
       const imported = pendingImport.modules;
 
+      // Filet de sécurité : l'état actuel reste restaurable si l'import ne
+      // contenait pas ce que l'enseignant attendait.
+      const snapshot = saveSafetySnapshot(
+        modules,
+        "avant restauration d'une sauvegarde",
+        APP_VERSION
+      );
+
       // En mode « ajouter », les identifiants sont régénérés pour ne jamais
       // écraser un module existant.
       const prepared =
@@ -604,6 +661,7 @@ export default function GradeAssistPage() {
       setModules(nextModules);
       setActiveModuleId(nextModules[0]?.id ?? null);
       setPendingImport(null);
+      setSafetySnapshot(snapshot);
       toast({
         title: "Sauvegarde restaurée",
         description: `${imported.length} module(s) ${
@@ -613,6 +671,38 @@ export default function GradeAssistPage() {
     },
     [pendingImport, modules, toast]
   );
+
+  // Restauration de la copie de sécurité automatique : elle passe par le
+  // même dialogue de confirmation que l'import d'un fichier.
+  const handleRestoreSafety = useCallback(() => {
+    const snapshot = readSafetySnapshot();
+    if (!snapshot) {
+      setSafetySnapshot(null);
+      toast({
+        variant: "destructive",
+        title: "Copie introuvable",
+        description:
+          "La copie de sécurité n'est plus disponible sur cet appareil.",
+      });
+      return;
+    }
+
+    try {
+      const parsed = parseBackup(snapshot.json);
+      const when = new Date(snapshot.savedAt).toLocaleString("fr-FR");
+      setPendingImport({
+        ...parsed,
+        fileName: `copie de sécurité du ${when}`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Restauration impossible",
+        description:
+          error instanceof Error ? error.message : "Copie de sécurité illisible.",
+      });
+    }
+  }, [toast]);
 
   // Show teacher login screen if not yet identified
   if (teacherChecked && !teacher) {
@@ -698,6 +788,19 @@ export default function GradeAssistPage() {
             event.target.value = "";
           }}
         />
+
+        {backupStatus && !reminderHidden && (
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+            <BackupReminder
+              status={backupStatus}
+              storageBytes={storageBytes}
+              safetySnapshot={safetySnapshot}
+              onBackup={handleExportBackup}
+              onRestoreSafety={handleRestoreSafety}
+              onDismiss={() => setReminderHidden(true)}
+            />
+          </div>
+        )}
 
         {storageFull && (
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-4">
@@ -835,7 +938,7 @@ export default function GradeAssistPage() {
                 <p>&copy; {new Date().getFullYear()} GradeAssist. Tous droits réservés.</p>
                 <p className="mt-1">
                   Données enregistrées sur cet appareil · {modules.length} module(s) ·{" "}
-                  {formatBytes(storageBytes)} utilisés
+                  {formatBytes(storageBytes)} utilisés · Sauvegarde : {lastBackupLabel}
                 </p>
                 <p className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
                     <Link href="/confidentialite" className="hover:text-accent underline-offset-4 hover:underline">Politique de confidentialité</Link>

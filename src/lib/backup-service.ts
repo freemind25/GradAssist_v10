@@ -15,6 +15,17 @@ import type { EvaluationData, EvaluationModule, ModuleType } from "@/types";
 export const BACKUP_APP_ID = "gradeassist";
 export const BACKUP_FORMAT_VERSION = 1;
 
+/** Date ISO du dernier export téléchargé par l'enseignant. */
+const LAST_BACKUP_KEY = "gradeAssist_lastBackupAt";
+
+/** Copie de sécurité prise juste avant une opération destructive. */
+const SAFETY_SNAPSHOT_KEY = "gradeAssist_safetySnapshot";
+
+/** Au-delà de ce délai, l'application rappelle de sauvegarder. */
+export const BACKUP_REMINDER_DAYS = 7;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /** Taille maximale acceptée à l'import (25 Mo). */
 const MAX_BACKUP_BYTES = 25 * 1024 * 1024;
 
@@ -234,3 +245,177 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
+
+// ══════════════════════════════════════════════════════════════
+//  SUIVI DES SAUVEGARDES
+//  Le stockage du navigateur n'est pas une sauvegarde : il disparaît
+//  avec les données de navigation, un changement d'appareil ou une
+//  réinstallation. Ces fonctions mesurent l'écart entre la dernière
+//  sauvegarde téléchargée et les données en cours, pour que l'application
+//  puisse le rappeler à l'enseignant.
+// ══════════════════════════════════════════════════════════════
+
+function readRaw(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    // Navigation privée ou stockage désactivé : aucun suivi possible.
+    return null;
+  }
+}
+
+function writeRaw(key: string, value: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    window.localStorage.setItem(key, value);
+    return true;
+  } catch {
+    // Quota dépassé : l'appelant décide quoi faire (version allégée…).
+    return false;
+  }
+}
+
+/** Date ISO de la dernière sauvegarde téléchargée, ou null. */
+export function getLastBackupAt(): string | null {
+  const raw = readRaw(LAST_BACKUP_KEY);
+  if (!raw) return null;
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+/** Mémorise qu'une sauvegarde vient d'être téléchargée. */
+export function recordBackupExport(date = new Date()): void {
+  writeRaw(LAST_BACKUP_KEY, date.toISOString());
+}
+
+export interface BackupStatus {
+  /** Des modules existent : il y a donc quelque chose à protéger. */
+  hasData: boolean;
+  lastBackupAt: string | null;
+  daysSinceBackup: number | null;
+  /** Vrai si l'utilisateur n'a jamais sauvegardé, ou depuis BACKUP_REMINDER_DAYS. */
+  stale: boolean;
+}
+
+/** État de la sauvegarde, calculé depuis les modules en mémoire. */
+export function getBackupStatus(
+  modules: EvaluationModule[],
+  now = new Date()
+): BackupStatus {
+  const hasData = modules.length > 0;
+  const lastBackupAt = getLastBackupAt();
+
+  if (!lastBackupAt) {
+    return { hasData, lastBackupAt: null, daysSinceBackup: null, stale: hasData };
+  }
+
+  const daysSinceBackup = Math.floor(
+    (now.getTime() - new Date(lastBackupAt).getTime()) / DAY_MS
+  );
+
+  return {
+    hasData,
+    lastBackupAt,
+    daysSinceBackup,
+    stale: hasData && daysSinceBackup >= BACKUP_REMINDER_DAYS,
+  };
+}
+
+// ── Copie de sécurité automatique ────────────────────────────────────
+
+export interface SafetySnapshot {
+  savedAt: string;
+  /** Ce que l'utilisateur était en train de faire (restauration, migration…). */
+  reason: string;
+  moduleCount: number;
+  /**
+   * Sauvegarde JSON, au même format que les exports manuels, mais sans les
+   * pièces jointes encodées en base64 (PDF de canevas, logo).
+   */
+  json: string;
+}
+
+/** Copie de sécurité sans le JSON : ce qui suffit à l'afficher. */
+export type SafetySnapshotInfo = Omit<SafetySnapshot, "json">;
+
+/**
+ * Retire les pièces jointes les plus lourdes (PDF du canevas en base64,
+ * logo).
+ *
+ * Une copie complète occuperait presque autant que les données elles-mêmes
+ * et ferait déborder le quota du navigateur au pire moment : la copie de
+ * sécurité ne garde donc que ce qui est nécessaire pour retravailler un
+ * module, jamais les fichiers déjà exportables séparément.
+ */
+function withoutEmbeddedFiles(
+  modules: EvaluationModule[]
+): EvaluationModule[] {
+  return modules.map((module) => ({
+    ...module,
+    evaluationData: {
+      ...module.evaluationData,
+      universityLogo: null,
+      syllabus: { ...module.evaluationData.syllabus, pdfDataUrl: null },
+    },
+  }));
+}
+
+/**
+ * Enregistre une copie de sécurité de l'état courant, au format d'export.
+ *
+ * Appelée avant toute opération qui remplace les modules (restauration d'un
+ * fichier, migration de version). Seules les données pédagogiques sont
+ * conservées : les PDF de canevas et les logos sont retirés, puisqu'ils sont
+ * volumineux et déjà couverts par l'export manuel.
+ *
+ * Retourne les métadonnées de la copie, ou null si le quota du navigateur
+ * n'a pas permis de l'écrire.
+ */
+export function saveSafetySnapshot(
+  modules: EvaluationModule[],
+  reason: string,
+  appVersion: string
+): SafetySnapshotInfo | null {
+  if (modules.length === 0) return null;
+
+  const savedAt = new Date().toISOString();
+  const snapshot: SafetySnapshot = {
+    savedAt,
+    reason,
+    moduleCount: modules.length,
+    json: serializeBackup(withoutEmbeddedFiles(modules), appVersion).json,
+  };
+
+  if (!writeRaw(SAFETY_SNAPSHOT_KEY, JSON.stringify(snapshot))) return null;
+
+  return {
+    savedAt,
+    reason,
+    moduleCount: modules.length,
+  };
+}
+
+/** Copie de sécurité disponible sur l'appareil, ou null. */
+export function readSafetySnapshot(): SafetySnapshot | null {
+  const raw = readRaw(SAFETY_SNAPSHOT_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) return null;
+
+    const { savedAt, reason, moduleCount, json } = parsed;
+    if (typeof json !== "string" || typeof savedAt !== "string") return null;
+
+    return {
+      savedAt,
+      reason: typeof reason === "string" ? reason : "",
+      moduleCount: typeof moduleCount === "number" ? moduleCount : 0,
+      json,
+    };
+  } catch {
+    return null;
+  }
+}
+

@@ -2,6 +2,32 @@
 
 Toutes les dates sont au format JJ/MM/AAAA.
 
+## Non publié — filet de sécurité sur les données (26/11/2026)
+
+Les données pédagogiques ne quittent pas l'appareil : le `localStorage` n'est
+pas une sauvegarde. Ce lot rend cet écart visible, et réversible.
+
+### Sauvegarde
+
+- **Bandeau de rappel** (`src/components/backup-reminder.tsx`) : apparaît dès
+  qu'aucune sauvegarde n'a été téléchargée, puis au-delà de 7 jours sans
+  export. Export direct depuis le bandeau, masquable pour la session.
+- **Suivi de la dernière sauvegarde** (`src/lib/backup-service.ts`) : la date
+  du dernier export est mémorisée et affichée en pied de page, à côté du volume
+  de données.
+- **Copie de sécurité automatique** avant toute restauration de fichier ou
+  migration de version : l'état précédent reste restaurable depuis le bandeau,
+  via le même dialogue de confirmation que l'import. La copie ne contient pas
+  les PDF de canevas ni les logos, volumineux et déjà couverts par l'export
+  manuel, afin de ne pas consommer le quota du navigateur.
+
+### Robustesse
+
+- **`src/app/error.tsx` et `src/app/global-error.tsx`** : une exception de rendu
+  affiche un écran explicatif avec « Réessayer » (ou « Recharger
+  l'application »), au lieu d'une page blanche. Aucune donnée locale n'est
+  touchée par ce chemin.
+
 ## Non publié — chantier « audit P0 » (22/11/2026)
 
 Série de corrections issues de l'audit de sécurité et de fiabilité. L'objectif
