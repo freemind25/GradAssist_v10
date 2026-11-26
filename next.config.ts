@@ -1,4 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { NextConfig } from 'next';
+
+// Version unique : package.json est la seule source. Elle est injectée au
+// build, donc disponible côté client (`process.env.NEXT_PUBLIC_APP_VERSION`)
+// comme côté serveur, sans importer tout package.json dans le bundle.
+const { version: appVersion } = JSON.parse(
+  readFileSync(join(process.cwd(), 'package.json'), 'utf8')
+) as { version: string };
 
 // [SEC-05] Désactivé : un SVG peut contenir du JS inline exécutable dans le contexte
 // de l'app. Les logos universitaires doivent être convertis en PNG côté client avant
@@ -16,6 +25,7 @@ const isStaticExport = process.env.NEXT_STATIC_EXPORT === '1';
 const isDev = process.env.NODE_ENV === 'development';
 
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_APP_VERSION: appVersion },
   output: isStaticExport ? 'export' : 'standalone',
   // Limite les workers de génération : la sandbox a un plafond mémoire de 2 Go
   // et 96 cœurs -> Next en lance trop, d'où un SIGKILL (OOM) sans ces options.

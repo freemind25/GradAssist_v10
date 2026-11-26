@@ -1,85 +1,73 @@
 // cypress/e2e/00-smoke.cy.ts
-// Test de fumée — parcours critique de bout en bout
+// Test de fumée — parcours critique de bout en bout.
+//
+// Ce spec remplace l'ancienne suite (`01-` à `07-`), écrite pour une version
+// qui n'existe plus : elle attendait un sélecteur « Module Actif », un bouton
+// « Nouveau » et des modules « Atelier Projet de Ville 1 ». Une suite rouge en
+// permanence ne protège rien ; celle-ci suit l'interface réelle et tourne en CI.
 
-describe('GradeAssist — Smoke Test (parcours critique)', () => {
-  it('parcours complet : chargement → création module → saisie → export', () => {
-    // ── 1. Chargement ──────────────────────────────────────────────────────────
+describe("GradeAssist — parcours critique", () => {
+  beforeEach(() => {
     cy.clearLocalStorage();
-    cy.visit('/');
-    cy.wait(500);
-
-    cy.get('h1').should('contain.text', 'GradeAssist');
-    cy.contains('Application d\'Évaluation Modulaire').should('be.visible');
-
-    // ── 2. Création d'un module Atelier ────────────────────────────────────────
-    cy.contains('button', 'Nouveau').click();
-    cy.get('[role="dialog"]').should('be.visible');
-    cy.get('#module-name').type('Atelier Smoke Test');
-    cy.contains('label', 'Atelier').click();
-    cy.contains('button', 'Créer').click();
-    cy.get('[role="dialog"]').should('not.exist');
-
-    // Le module doit être sélectionné
-    cy.contains('Atelier Smoke Test').should('be.visible');
-
-    // ── 3. Vérification de la grille d'évaluation ──────────────────────────────
-    cy.contains('Présentation orale').should('be.visible');
-    cy.contains('A+').should('be.visible');
-
-    // ── 4. Vérification des boutons d'export ───────────────────────────────────
-    cy.contains('PDF', { matchCase: false }).should('exist');
-
-    // ── 5. Vérification du registre de présences ──────────────────────────────
-    cy.contains('Présences', { matchCase: false })
-      .should('exist')
-      .or(cy.contains('Registre').should('exist'));
-
-    // ── 6. Persistance dans localStorage ──────────────────────────────────────
-    cy.wait(500);
-    cy.window().then((win) => {
-      const stored = win.localStorage.getItem('gradeAssist_modules');
-      expect(stored).to.not.be.null;
-      const modules = JSON.parse(stored as string);
-      const smokeModule = modules.find((m: { name: string }) =>
-        m.name === 'Atelier Smoke Test'
-      );
-      expect(smokeModule).to.exist;
-      expect(smokeModule.type).to.equal('atelier');
-    });
-
-    // ── 7. Rechargement et vérification de persistance ────────────────────────
-    cy.reload();
-    cy.wait(500);
-    cy.contains('Atelier Smoke Test').should('be.visible');
+    cy.visit("/");
   });
 
-  it('parcours Module Standard : création → note CC/Examen → calcul', () => {
-    cy.clearLocalStorage();
-    cy.visit('/');
-    cy.wait(500);
+  it("identifie l'enseignant en mode invité, crée une matière et la retrouve après rechargement", () => {
+    // ── 1. Écran d'identification, puis application chargée ───────────────
+    cy.contains("Identification de l'enseignant").should("be.visible");
+    cy.loginAsGuest();
+    cy.contains("button", "Fichier").should("be.visible");
 
-    // Créer un module Standard
-    cy.contains('button', 'Nouveau').click();
-    cy.get('#module-name').type('Matière Smoke Standard');
-    cy.contains('label', 'Matière').click();
-    cy.contains('button', 'Créer').click();
-    cy.wait(300);
+    // ── 2. Création d'une matière classique ───────────────────────────────
+    cy.createModule("Matière Smoke CC", "standard");
 
-    // Vérifier que le module est actif
-    cy.contains('Matière Smoke Standard').should('be.visible');
+    // L'onglet du nouveau module affiche son type.
+    cy.contains("button", "Matière Smoke CC").should("contain.text", "MATIÈRE");
 
-    // Les champs numériques doivent exister
-    cy.get('input[type="number"]').should('have.length.gte', 1);
+    // ── 3. L'écran du module expose bien ses sections ─────────────────────
+    ["Informations", "Évaluation", "Présences", "Rapports"].forEach((section) => {
+      cy.contains("button", section).should("be.visible");
+    });
 
-    // Saisir des notes
-    cy.get('input[type="number"]').first().clear().type('15');
-    cy.get('input[type="number"]').first().should('have.value', '15');
-
-    // Vérifier persistance
-    cy.wait(500);
+    // ── 4. Persistance locale ─────────────────────────────────────────────
+    // L'écriture est différée d'une seconde : on laisse le délai s'écouler.
+    cy.wait(1200);
     cy.window().then((win) => {
-      const stored = win.localStorage.getItem('gradeAssist_modules');
-      expect(stored).to.not.be.null;
+      const stored = win.localStorage.getItem("gradeAssist_modules");
+      expect(stored, "modules écrits dans le localStorage").to.not.be.null;
+      const modules = JSON.parse(stored as string) as {
+        name: string;
+        type: string;
+      }[];
+      const created = modules.find((m) => m.name === "Matière Smoke CC");
+      expect(created, "le module créé est enregistré").to.not.be.undefined;
+      expect(created?.type).to.equal("standard");
+    });
+
+    // ── 5. Rechargement : le module est toujours là ───────────────────────
+    cy.reload();
+    cy.contains("button", "Matière Smoke CC").should("be.visible");
+  });
+
+  it("rappelle la sauvegarde puis la considère à jour après export", () => {
+    cy.loginAsGuest();
+
+    // Aucune sauvegarde n'a jamais été téléchargée : le rappel s'affiche.
+    cy.contains("Vos données n'existent que dans ce navigateur").should(
+      "be.visible"
+    );
+    cy.get("footer").should("contain.text", "Sauvegarde : aucune");
+
+    // Télécharger la sauvegarde repart de zéro.
+    cy.contains("button", "Télécharger une sauvegarde").click();
+    cy.contains("Vos données n'existent que dans ce navigateur").should(
+      "not.exist"
+    );
+    cy.get("footer").should("contain.text", "Sauvegarde : aujourd'hui");
+
+    cy.window().then((win) => {
+      expect(win.localStorage.getItem("gradeAssist_lastBackupAt")).to.not.be
+        .null;
     });
   });
 });

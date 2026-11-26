@@ -38,7 +38,12 @@ export async function GET() {
     return NextResponse.json(
       {
         status: allHealthy ? "ok" : "degraded",
-        version: process.env.npm_package_version || "2.8.0",
+        // `npm_package_version` n'existe que lancé par npm ; la valeur injectée
+        // au build depuis package.json sert de repli (Vercel, conteneur…).
+        version:
+          process.env.npm_package_version ||
+          process.env.NEXT_PUBLIC_APP_VERSION ||
+          "inconnue",
         uptime: Math.round(uptime),
         responseTimeMs,
         checks,

@@ -73,7 +73,9 @@ import {
 const LOCALSTORAGE_MODULES_KEY = 'gradeAssist_modules';
 const LOCALSTORAGE_ACTIVE_MODULE_ID_KEY = 'gradeAssist_activeModuleId';
 const LOCALSTORAGE_VERSION_KEY = 'gradeAssist_version';
-const APP_VERSION = '2.8.0';
+// Injectée au build depuis package.json (voir next.config.ts) : une seule
+// version pour l'application, l'export et les rapports.
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? 'dev';
 
 // Default module names from older versions that should be replaced
 const OLD_DEFAULT_MODULE_NAMES = [
@@ -844,7 +846,10 @@ export default function GradeAssistPage() {
               <NewModuleDialog
                 onCreate={handleCreateModule}
                 trigger={
-                  <button className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors border border-dashed border-border">
+                  <button
+                    data-testid="add-module"
+                    className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors border border-dashed border-border"
+                  >
                     <Plus className="h-4 w-4" />
                     <span className="hidden sm:inline">Ajouter</span>
                   </button>

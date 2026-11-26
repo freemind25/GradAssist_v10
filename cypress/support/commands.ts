@@ -9,74 +9,60 @@ declare global {
   namespace Cypress {
     interface Chainable {
       /**
-       * Crée un nouveau module via le dialog de création.
-       * @param name - Nom du module
-       * @param type - 'atelier' | 'standard'
+       * Passe l'écran d'identification en mode invité, puis referme le
+       * dialogue de configuration qui s'ouvre sur les modules vides.
        */
-      createModule(name: string, type?: 'atelier' | 'standard'): Chainable<void>;
+      loginAsGuest(): Chainable<void>;
 
       /**
-       * Attend que l'application soit hydratée (localStorage chargé).
+       * Crée un module via le dialogue « Créer une nouvelle matière ».
+       * @param name - Nom de la matière
+       * @param type - 'atelier' | 'standard' | 'mooc'
        */
-      waitForApp(): Chainable<void>;
-
-      /**
-       * Sélectionne un module actif via le Select.
-       * @param partialName - Partie du nom du module à sélectionner
-       */
-      selectModule(partialName: string): Chainable<void>;
-
-      /**
-       * Remplit un champ d'information étudiant.
-       */
-      fillStudentInfo(field: string, value: string): Chainable<void>;
+      createModule(
+        name: string,
+        type?: "atelier" | "standard" | "mooc"
+      ): Chainable<void>;
     }
   }
 }
 
-Cypress.Commands.add('waitForApp', () => {
-  // Attendre que la sélection de module soit visible
-  cy.get('[placeholder="Sélectionner une matière..."], [data-placeholder="Sélectionner une matière..."]', { timeout: 10000 })
-    .should('exist');
+const TYPE_LABELS = {
+  atelier: "Atelier (Évaluation par critères)",
+  standard: "Matière Classique (CC + Examen)",
+  mooc: "Cours en ligne MOOC (CC + Examen)",
+} as const;
+
+Cypress.Commands.add("loginAsGuest", () => {
+  cy.contains("button", "Continuer sans identification").click();
+  cy.get("header").should("contain.text", "GradeAssist");
+
+  // Les modules par défaut sont vides : l'application propose de les
+  // configurer dès le chargement. On refuse, comme le ferait un enseignant.
+  cy.get("body").then(($body) => {
+    if ($body.find('[role="dialog"]').length > 0) {
+      cy.get('[role="dialog"]').contains("button", "Annuler").click();
+      cy.get('[role="dialog"]').should("not.exist");
+    }
+  });
 });
 
-Cypress.Commands.add('createModule', (name: string, type: 'atelier' | 'standard' = 'atelier') => {
-  // Clic sur le bouton "Nouveau" (trigger du dialog)
-  cy.contains('button', 'Nouveau').click();
-
-  // Attendre le dialog
-  cy.get('[role="dialog"]').should('be.visible');
-
-  // Saisir le nom
-  cy.get('#module-name').clear().type(name);
-
-  // Sélectionner le type
-  if (type === 'standard') {
-    cy.contains('label', 'Matière').click();
-  } else {
-    cy.contains('label', 'Atelier').click();
+Cypress.Commands.add(
+  "createModule",
+  (name: string, type: "atelier" | "standard" | "mooc" = "atelier") => {
+    // Le libellé « Ajouter » est masqué sous 640 px : on s'appuie sur un
+    // repère stable plutôt que sur le texte visible.
+    cy.get('[data-testid="add-module"]').click();
+    cy.get('[role="dialog"]').should(
+      "contain.text",
+      "Créer une nouvelle matière"
+    );
+    cy.get("#module-name").clear().type(name);
+    cy.contains("label", TYPE_LABELS[type]).click();
+    cy.contains("button", "Créer").click();
+    cy.get('[role="dialog"]').should("not.exist");
+    cy.contains("button", name).should("be.visible");
   }
-
-  // Confirmer
-  cy.contains('button', 'Créer').click();
-
-  // Vérifier que le dialog se ferme
-  cy.get('[role="dialog"]').should('not.exist');
-});
-
-Cypress.Commands.add('selectModule', (partialName: string) => {
-  cy.get('[placeholder="Sélectionner une matière..."]')
-    .closest('[data-radix-select-trigger]')
-    .click();
-  cy.contains('[role="option"]', partialName).click();
-});
-
-Cypress.Commands.add('fillStudentInfo', (field: string, value: string) => {
-  cy.contains('label', field)
-    .siblings('input')
-    .first()
-    .clear()
-    .type(value);
-});
+);
 
 export {};

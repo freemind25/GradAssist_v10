@@ -24,9 +24,6 @@ concurrency:
 
 env:
   NEXT_TELEMETRY_DISABLED: "1"
-  # Cypress télécharge un binaire de ~250 Mo à l'installation ; les tests E2E
-  # ne tournent pas ici, donc inutile de le récupérer.
-  CYPRESS_INSTALL_BINARY: "0"
 
 jobs:
   build:
@@ -48,8 +45,12 @@ jobs:
       # npm ci (et non npm install) : installe exactement le lockfile et
       # échoue si package.json et package-lock.json divergent, au lieu de
       # résoudre silencieusement une version différente à chaque run.
+      # Le binaire Cypress (~250 Mo) n'est pas nécessaire ici : l'étape E2E
+      # l'installe pour elle-même.
       - name: Install dependencies
         run: npm ci --legacy-peer-deps --no-audit --no-fund
+        env:
+          CYPRESS_INSTALL_BINARY: "0"
 
       - name: Type check
         run: npm run typecheck
@@ -59,3 +60,50 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # Parcours critique réellement exécuté dans un navigateur.
+  # La suite précédente avait dérivé au point de décrire une interface
+  # disparue : elle n'a jamais tourné et ne protégeait donc rien.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.18.0'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+        env:
+          CYPRESS_INSTALL_BINARY: "0"
+
+      # Le binaire est téléchargé explicitement : l'étape suivante ne fait
+      # que démarrer l'application et lancer les tests.
+      - name: Install Cypress
+        run: npx cypress install
+
+      - name: Run smoke tests
+        uses: cypress-io/github-action@v6
+        with:
+          install: false
+          build: npm run build
+          start: npm run start
+          wait-on: 'http://localhost:3000'
+          wait-on-timeout: 180
+          spec: cypress/e2e/00-smoke.cy.ts
+        env:
+          CYPRESS_BASE_URL: http://localhost:3000
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-screenshots
+          path: cypress/screenshots
+          if-no-files-found: ignore

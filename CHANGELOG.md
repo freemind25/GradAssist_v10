@@ -2,6 +2,26 @@
 
 Toutes les dates sont au format JJ/MM/AAAA.
 
+## Non publié — parcours critique testé en CI et version unique (26/11/2026)
+
+### Tests
+
+- **Smoke test Cypress exécuté en CI** (`cypress/e2e/00-smoke.cy.ts`, job
+  `e2e`) : identification en mode invité, création d'une matière, sections du
+  module, persistance dans le `localStorage` après rechargement, rappel de
+  sauvegarde puis disparition du rappel après export. Les sept anciens specs
+  (`01-` à `07-`) décrivaient une interface disparue — sélecteur « Module
+  Actif », bouton « Nouveau », modules « Atelier Projet de Ville 1 » — et
+  n'auraient jamais pu passer ; ils sont retirés plutôt que laissés en échec.
+
+### Dette
+
+- **Version unique** : `package.json` (2.9.12) est désormais la seule source,
+  injectée au build dans `NEXT_PUBLIC_APP_VERSION`. `page.tsx` annonçait encore
+  `2.8.0` et `/api/health` retombait sur cette même valeur obsolète.
+- **Page d'installation Android** : elle citait encore `GradeAssist-2.9.10.apk`.
+  Le nom affiché suit désormais la version publiée.
+
 ## Non publié — filet de sécurité sur les données (26/11/2026)
 
 Les données pédagogiques ne quittent pas l'appareil : le `localStorage` n'est
